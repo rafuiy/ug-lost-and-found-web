@@ -23,12 +23,22 @@ Panel tidak boleh diakses pelapor atau publik.
 | Build tool | Vite |
 | UI | React + TypeScript |
 | Styling | Tailwind CSS |
+| Font | PLUS JAKARTA SANS (Google Fonts) |
+| Icons | React Icons library only |
+| Design Guideline | UI_GUIDELINE.md + IMPECCABLE_TASTE_SKILL.md |
 | Platform | Web responsive, fokus desktop loket |
 | API | REST backend Go |
 | Auth | JWT dari backend |
 | Data | Inventori dan laporan internal |
 
 Frontend mengikuti alur dan kebutuhan visual pada DOCX. Backend yang dipakai adalah Go + Fiber + GORM + PostgreSQL + auto migration.
+
+**Design Compliance:**
+- Semua teks memakai font PLUS JAKARTA SANS (load dari Google Fonts).
+- Icon hanya dari React Icons; tidak ada icon set lain.
+- Hindari pola AI slop: gradients dekoratif, tabel/card simetris, chip generik, warna arbitrary.
+- Spacing mengikuti skala: 4px, 8px, 16px, 24px.
+- Color semantic: intent dan hierarchy, bukan dekorasi.
 
 ## 3. Tujuan
 
@@ -468,6 +478,16 @@ Semua endpoint selain login membutuhkan JWT. Backend menjadi sumber kebenaran un
 - [ ] Semua mutation memiliki loading, error, success, dan refresh state.
 - [ ] Token expired mengeluarkan admin ke halaman login.
 - [ ] Layout usable pada desktop dan mobile.
+
+**Design & Style Compliance:**
+- [ ] Semua teks pakai font PLUS JAKARTA SANS (Google Fonts import).
+- [ ] Icon hanya dari React Icons (20px/24px/16px sizes); tidak ada icon set lain.
+- [ ] Tidak ada gradient dekoratif pada button, background, atau card.
+- [ ] Tabel dan card layout didasarkan data importance, bukan simetri aesthetis.
+- [ ] Spacing konsisten: 4px, 8px, 16px, 24px scale.
+- [ ] Color intent-driven: error=red, success=green, info=blue, danger=red, dll.
+- [ ] Tidak ada generic chip atau badge UI tanpa konteks/interaksi.
+- [ ] Desain audit: review sidebar nav, button styling, form inputs vs UI_GUIDELINE.md.
 
 ## 14. Risiko dan Mitigasi
 

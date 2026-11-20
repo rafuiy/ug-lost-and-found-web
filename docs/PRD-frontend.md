@@ -18,11 +18,21 @@ Frontend User adalah web responsive untuk mahasiswa atau pelapor. Aplikasi mengi
 | Build tool | Vite |
 | UI | React + TypeScript |
 | Styling | Tailwind CSS |
+| Font | PLUS JAKARTA SANS (Google Fonts) |
+| Icons | React Icons library only |
+| Design Guideline | UI_GUIDELINE.md + IMPECCABLE_TASTE_SKILL.md |
 | Platform | Web responsive desktop dan mobile |
 | Data | REST API backend |
 | Auth user | Tidak ada login |
 
 Frontend tidak boleh mengandalkan data inventori untuk mencocokkan barang. Pencocokan dilakukan admin berdasarkan data tertutup dan verifikasi fisik.
+
+**Design Compliance:**
+- Semua teks memakai font PLUS JAKARTA SANS (load dari Google Fonts).
+- Icon hanya dari React Icons; tidak ada icon set lain.
+- Hindari pola AI slop: gradients dekoratif, card simetris, chip generik, warna arbitrary.
+- Spacing mengikuti skala: 4px, 8px, 16px, 24px.
+- Color semantic: intent, bukan dekorasi.
 
 ## 3. Tujuan
 
@@ -333,6 +343,16 @@ Validasi frontend meningkatkan UX. Backend tetap menjadi sumber kebenaran keaman
 - [ ] Loading state mencegah submit ganda.
 - [ ] Layout berfungsi pada mobile dan desktop.
 - [ ] Form dan error dapat digunakan dengan keyboard dan screen reader.
+
+**Design & Style Compliance:**
+- [ ] Semua teks pakai font PLUS JAKARTA SANS (Google Fonts import).
+- [ ] Icon hanya dari React Icons (20px/24px/16px sizes); tidak ada icon set lain.
+- [ ] Tidak ada gradient dekoratif pada button atau background.
+- [ ] Card/section layout didasarkan hierarchy konten, bukan simetri.
+- [ ] Spacing konsisten: 4px, 8px, 16px, 24px scale.
+- [ ] Color intent-driven (error=red, success=green, dll), bukan random palette.
+- [ ] Tidak ada generic chip atau UI element tanpa interaksi.
+- [ ] Desain audit: review vs UI_GUIDELINE.md dan IMPECCABLE_TASTE_SKILL.md.
 
 ## 13. Risiko dan Mitigasi
 
