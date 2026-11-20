@@ -141,6 +141,7 @@ Backend tidak menyediakan katalog inventori publik.
 | `Perlu Verifikasi` | Ada kecocokan awal dan pelapor harus datang ke loket |
 | `Selesai` | Serah terima berhasil |
 | `Ditolak` | Laporan tidak valid atau verifikasi gagal |
+| Dibatalkan | laporan dikembalikan dari perlu verifikasi karena human error |
 
 `is_stale` adalah flag terpisah. Nilai `true` berarti laporan `Belum Ada` lebih dari 30 hari.
 
@@ -152,6 +153,7 @@ Transisi valid:
 - `Perlu Verifikasi` → `Selesai`
 - `Perlu Verifikasi` → `Belum Ada`
 - `Perlu Verifikasi` → `Ditolak`
+- 'perlu verifikasi' - 'Dibatalkan' - 'belum ada'
 
 ### 7.2 Status Inventori
 
