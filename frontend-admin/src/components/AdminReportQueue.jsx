@@ -5,11 +5,32 @@ import { INPUT_CLASS } from './ui/styles';
 import {
   LuSearch,
   LuFilter,
+  LuCalendar,
   LuChevronDown,
   LuEye,
   LuClock,
   LuRefreshCw,
 } from 'react-icons/lu';
+
+const STATUS_TABS = [
+  'Semua',
+  'Belum Ada',
+  'Perlu Verifikasi',
+  'Selesai',
+  'Ditolak',
+  'Dibatalkan',
+];
+
+function parseReportDateMs(reportedAt) {
+  if (!reportedAt) return 0;
+  const match = reportedAt
+    .trim()
+    .match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (!match) return 0;
+  const [, day, month, year, hour = '00', minute = '00'] = match;
+  const ms = Date.parse(`${year}-${month}-${day}T${hour}:${minute}:00`);
+  return Number.isNaN(ms) ? 0 : ms;
+}
 
 function formatWibTime(date) {
   return new Intl.DateTimeFormat('id-ID', {
@@ -27,17 +48,17 @@ export const AdminReportQueue = ({
   onReviewReport,
   activeFilterTab,
   onFilterTabChange,
-  onlyStale: controlledOnlyStale,
-  onOnlyStaleChange,
+  dateRangeFilter: controlledDateRange,
+  onDateRangeFilterChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [internalOnlyStale, setInternalOnlyStale] = useState(false);
+  const [internalDateRange, setInternalDateRange] = useState('ALL');
   const [lastUpdated, setLastUpdated] = useState(() => formatWibTime(new Date()));
 
-  const onlyStale =
-    controlledOnlyStale !== undefined ? controlledOnlyStale : internalOnlyStale;
-  const setOnlyStale = onOnlyStaleChange || setInternalOnlyStale;
+  const dateRangeFilter =
+    controlledDateRange !== undefined ? controlledDateRange : internalDateRange;
+  const setDateRangeFilter = onDateRangeFilterChange || setInternalDateRange;
 
   const handleRefresh = () => {
     setLastUpdated(formatWibTime(new Date()));
@@ -49,9 +70,37 @@ export const AdminReportQueue = ({
   }, [reports]);
 
   const filteredReports = useMemo(() => {
+    const refMs = reports.reduce(
+      (max, r) => Math.max(max, parseReportDateMs(r.reportedAt)),
+      0
+    );
+    const refDay = refMs ? new Date(refMs).toDateString() : '';
+
     return reports.filter((item) => {
       if (activeFilterTab !== 'Semua' && item.status !== activeFilterTab) return false;
-      if (onlyStale && !item.isStale) return false;
+
+      if (dateRangeFilter === 'STALE') {
+        if (!item.isStale) return false;
+      } else if (dateRangeFilter !== 'ALL' && refMs) {
+        const itemMs = parseReportDateMs(item.reportedAt);
+        if (itemMs) {
+          if (dateRangeFilter === 'TODAY' && new Date(itemMs).toDateString() !== refDay) {
+            return false;
+          }
+          if (
+            dateRangeFilter === '7D' &&
+            (item.isStale || refMs - itemMs > 7 * 86400000)
+          ) {
+            return false;
+          }
+          if (
+            dateRangeFilter === '30D' &&
+            (item.isStale || refMs - itemMs > 30 * 86400000)
+          ) {
+            return false;
+          }
+        }
+      }
 
       if (selectedCategory !== 'ALL' && item.category !== selectedCategory) {
         return false;
@@ -70,29 +119,19 @@ export const AdminReportQueue = ({
 
       return true;
     });
-  }, [reports, activeFilterTab, onlyStale, selectedCategory, searchQuery]);
-
-  const counts = {
-    all: reports.length,
-    belumAda: reports.filter((r) => r.status === 'Belum Ada').length,
-    perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
-    selesai: reports.filter((r) => r.status === 'Selesai').length,
-    ditolak: reports.filter((r) => r.status === 'Ditolak').length,
-    dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
-    lawas: reports.filter((r) => r.isStale).length,
-  };
+  }, [reports, activeFilterTab, dateRangeFilter, selectedCategory, searchQuery]);
 
   const trimmedQuery = searchQuery.trim().toLowerCase();
 
   const hasActiveFilter =
     activeFilterTab !== 'Semua' ||
-    onlyStale ||
+    dateRangeFilter !== 'ALL' ||
     selectedCategory !== 'ALL' ||
     trimmedQuery !== '';
 
   const handleResetFilters = () => {
     onFilterTabChange('Semua');
-    setOnlyStale(false);
+    setDateRangeFilter('ALL');
     setSelectedCategory('ALL');
     setSearchQuery('');
   };
@@ -152,46 +191,55 @@ export const AdminReportQueue = ({
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setOnlyStale((prev) => !prev)}
-            aria-pressed={onlyStale}
-            className={
-              onlyStale
-                ? 'h-10 px-3 rounded-[4px] border-[1.5px] border-gold-ink bg-gold-wash text-xs font-bold text-gold-ink inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer tabular-nums shrink-0'
-                : 'h-10 px-3 rounded-[4px] border-[1.5px] border-line-strong bg-sheet text-xs font-semibold text-ink-2 hover:border-ink-2 hover:text-ink inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer tabular-nums shrink-0'
-            }
-          >
-            <LuClock className="size-4 shrink-0" aria-hidden="true" />
-            <span>Hanya Lawas (&gt;30h)</span>
-            <span>({counts.lawas})</span>
-          </button>
+          <div className="relative shrink-0 md:w-56">
+            <LuCalendar
+              className={`size-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                dateRangeFilter === 'STALE' ? 'text-gold-ink' : 'text-ink-3'
+              }`}
+              aria-hidden="true"
+            />
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(e.target.value)}
+              aria-label="Filter rentang waktu laporan"
+              className={`${INPUT_CLASS} h-10 appearance-none pl-9 pr-9 font-semibold cursor-pointer ${
+                dateRangeFilter === 'STALE'
+                  ? 'border-gold-ink bg-gold-wash text-gold-ink font-bold'
+                  : ''
+              }`}
+            >
+              <option value="ALL">Rentang: Semua Waktu</option>
+              <option value="TODAY">Rentang: Hari Ini</option>
+              <option value="7D">Rentang: 7 Hari Terakhir</option>
+              <option value="30D">Rentang: 30 Hari Terakhir</option>
+              <option value="STALE">Rentang: Lawas (&gt;30 Hari)</option>
+            </select>
+            <LuChevronDown
+              className={`size-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                dateRangeFilter === 'STALE' ? 'text-gold-ink' : 'text-ink-3'
+              }`}
+              aria-hidden="true"
+            />
+          </div>
         </div>
 
         {/* Row 2: Mutually Exclusive Status Tabs & Reset */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="inline-flex items-center gap-1 rounded-[4px] border-[1.5px] border-line-strong bg-paper p-1 overflow-x-auto max-w-full text-xs">
-            {[
-              { key: 'Semua', label: `Semua (${counts.all})` },
-              { key: 'Belum Ada', label: `Belum Ada (${counts.belumAda})` },
-              { key: 'Perlu Verifikasi', label: `Perlu Verifikasi (${counts.perluVerifikasi})` },
-              { key: 'Selesai', label: `Selesai (${counts.selesai})` },
-              { key: 'Ditolak', label: `Ditolak (${counts.ditolak})` },
-              { key: 'Dibatalkan', label: `Dibatalkan (${counts.dibatalkan})` },
-            ].map((tab) => {
-              const isActive = activeFilterTab === tab.key;
+            {STATUS_TABS.map((statusKey) => {
+              const isActive = activeFilterTab === statusKey;
               return (
                 <button
-                  key={tab.key}
+                  key={statusKey}
                   type="button"
-                  onClick={() => onFilterTabChange(tab.key)}
-                  className={`px-3 py-1.5 rounded-[3px] transition-colors whitespace-nowrap tabular-nums cursor-pointer ${
+                  onClick={() => onFilterTabChange(statusKey)}
+                  className={`px-3 py-1.5 rounded-[3px] transition-colors whitespace-nowrap cursor-pointer ${
                     isActive
                       ? 'bg-ug-950 text-sheet font-bold'
                       : 'text-ink-2 hover:text-ink font-semibold'
                   }`}
                 >
-                  {tab.label}
+                  {statusKey}
                 </button>
               );
             })}

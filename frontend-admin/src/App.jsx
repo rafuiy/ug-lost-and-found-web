@@ -50,7 +50,7 @@ export function App() {
   const [toasts, setToasts] = useState([]);
 
   const [activeFilterTab, setActiveFilterTab] = useState('Semua');
-  const [onlyStaleFilter, setOnlyStaleFilter] = useState(false);
+  const [dateRangeFilter, setDateRangeFilter] = useState('ALL');
   const [selectedTicketCode, setSelectedTicketCode] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [handoverPreloadTicket, setHandoverPreloadTicket] = useState('');
@@ -653,6 +653,7 @@ export function App() {
     perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
     lawas: reports.filter((r) => r.isStale).length,
     selesai: reports.filter((r) => r.status === 'Selesai').length,
+    ditolak: reports.filter((r) => r.status === 'Ditolak').length,
     dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
   };
 
@@ -695,9 +696,11 @@ export function App() {
             <AdminStatsCards
               counts={statsCounts}
               activeFilterTab={activeFilterTab}
-              onlyStale={onlyStaleFilter}
+              onlyStale={dateRangeFilter === 'STALE'}
               onSelectStatus={setActiveFilterTab}
-              onToggleStale={() => setOnlyStaleFilter((prev) => !prev)}
+              onToggleStale={() =>
+                setDateRangeFilter((prev) => (prev === 'STALE' ? 'ALL' : 'STALE'))
+              }
             />
 
             <AdminReportQueue
@@ -705,8 +708,8 @@ export function App() {
               onReviewReport={handleReviewReport}
               activeFilterTab={activeFilterTab}
               onFilterTabChange={setActiveFilterTab}
-              onlyStale={onlyStaleFilter}
-              onOnlyStaleChange={setOnlyStaleFilter}
+              dateRangeFilter={dateRangeFilter}
+              onDateRangeFilterChange={setDateRangeFilter}
             />
           </div>
         )}
