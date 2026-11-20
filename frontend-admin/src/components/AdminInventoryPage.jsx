@@ -13,6 +13,8 @@ import {
   LuPlus,
   LuPencil,
   LuArchive,
+  LuFilter,
+  LuChevronDown,
 } from 'react-icons/lu';
 
 export const AdminInventoryPage = ({
@@ -25,6 +27,7 @@ export const AdminInventoryPage = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [drawerState, setDrawerState] = useState({
     isOpen: false,
     mode: 'create',
@@ -54,9 +57,15 @@ export const AdminInventoryPage = ({
     return map;
   }, [reports]);
 
+  const categories = useMemo(
+    () => ['ALL', ...Array.from(new Set(inventoryList.map((item) => item.category)))],
+    [inventoryList]
+  );
+
   const filteredInventory = useMemo(() => {
     return inventoryList.filter((item) => {
       if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
+      if (categoryFilter !== 'ALL' && item.category !== categoryFilter) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         return (
@@ -70,7 +79,7 @@ export const AdminInventoryPage = ({
       }
       return true;
     });
-  }, [inventoryList, statusFilter, searchQuery]);
+  }, [inventoryList, statusFilter, categoryFilter, searchQuery]);
 
   const handleOpenCreate = () => {
     setDrawerState({ isOpen: true, mode: 'create', item: null });
@@ -124,28 +133,56 @@ export const AdminInventoryPage = ({
       </div>
 
       {/* Toolbar */}
-      <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
-          <LuSearch
-            className="size-4 text-ink-3 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-            aria-hidden="true"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari ID Inventori, nama barang, atau loker..."
-            className={`${INPUT_CLASS} h-10 pl-10 ${searchQuery ? 'pr-16' : ''}`}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-2 hover:text-ink cursor-pointer"
+      <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <LuSearch
+              className="size-4 text-ink-3 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari ID Inventori, nama barang, atau loker..."
+              className={`${INPUT_CLASS} h-10 pl-10 ${searchQuery ? 'pr-16' : ''}`}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-2 hover:text-ink cursor-pointer"
+              >
+                Hapus
+              </button>
+            )}
+          </div>
+
+          <div className="relative shrink-0 sm:w-52">
+            <LuFilter
+              className="size-4 text-ink-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              aria-hidden="true"
+            />
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="Filter kategori inventori"
+              className={`${INPUT_CLASS} h-10 appearance-none pl-9 pr-9 font-semibold cursor-pointer`}
             >
-              Hapus
-            </button>
-          )}
+              <option value="ALL">Semua Kategori</option>
+              {categories
+                .filter((c) => c !== 'ALL')
+                .map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+            </select>
+            <LuChevronDown
+              className="size-4 text-ink-3 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              aria-hidden="true"
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-1 rounded-[4px] border-[1.5px] border-line-strong bg-paper p-1 text-xs">

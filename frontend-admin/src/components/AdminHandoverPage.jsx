@@ -31,6 +31,9 @@ function validateHandoverReport(found, code) {
   if (found.status === 'Ditolak') {
     return `Tiket ${code} berstatus "Ditolak" dan tidak dapat diproses serah terima.`;
   }
+  if (found.status === 'Dibatalkan') {
+    return `Tiket ${code} berstatus "Dibatalkan" dan tidak dapat diproses serah terima.`;
+  }
   if (found.status !== 'Perlu Verifikasi') {
     return `Tiket ${code} masih berstatus "${found.status}". Terbitkan undangan verifikasi terlebih dahulu sebelum serah terima.`;
   }
