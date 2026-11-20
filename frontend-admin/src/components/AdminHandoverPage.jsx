@@ -107,6 +107,7 @@ export const AdminHandoverPage = ({
     'Diserahkan dalam kondisi fisik baik dan berfungsi normal.'
   );
   const [photoEvidence, setPhotoEvidence] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
 
@@ -148,6 +149,7 @@ export const AdminHandoverPage = ({
     availableInventory.find((inv) => inv.id === selectedInventoryId) || null;
 
   const handleSimulatePhotoUpload = () => {
+    setPhotoFile(null);
     setPhotoEvidence(
       'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80'
     );
@@ -156,6 +158,7 @@ export const AdminHandoverPage = ({
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onload = () => {
         setPhotoEvidence(String(reader.result || ''));
@@ -174,20 +177,26 @@ export const AdminHandoverPage = ({
     recipientNpm.trim().length > 0 &&
     photoEvidence.length > 0;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isFormValid || !loadedReport || !selectedInventory) return;
+    if (!isFormValid || !loadedReport || !selectedInventory || isSubmitting) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      onCompleteHandover({
+    setErrorMsg('');
+    try {
+      const ok = await onCompleteHandover({
         ticketCode: loadedReport.ticketCode,
         inventoryId: selectedInventory.id,
         recipientName,
         recipientNpm,
         notes: handoverNotes,
         photoEvidence,
+        photoFile,
       });
+
+      if (ok === false) {
+        return;
+      }
 
       setReceiptData({
         ticket: loadedReport.ticketCode,
@@ -200,8 +209,9 @@ export const AdminHandoverPage = ({
           timeStyle: 'medium',
         }),
       });
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   const resetForm = () => {
@@ -212,6 +222,7 @@ export const AdminHandoverPage = ({
     setKtmChecked(false);
     setSecretChecked(false);
     setPhotoEvidence('');
+    setPhotoFile(null);
     setReceiptData(null);
   };
 

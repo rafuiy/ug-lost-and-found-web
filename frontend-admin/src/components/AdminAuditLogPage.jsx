@@ -156,6 +156,19 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
               <option value="STATUS_REVERT">STATUS_REVERT</option>
               <option value="HANDOVER_VOID">HANDOVER_VOID</option>
               <option value="INV_DELETE">INV_DELETE</option>
+              <option value="AUTH_LOGIN_SUCCESS">AUTH_LOGIN_SUCCESS</option>
+              <option value="AUTH_LOGIN_FAILED">AUTH_LOGIN_FAILED</option>
+              <option value="AUTH_LOGOUT">AUTH_LOGOUT</option>
+              <option value="INVENTORY_CREATED">INVENTORY_CREATED</option>
+              <option value="INVENTORY_UPDATED">INVENTORY_UPDATED</option>
+              <option value="REPORT_CREATED">REPORT_CREATED</option>
+              <option value="REPORT_STATUS_UPDATED">REPORT_STATUS_UPDATED</option>
+              <option value="REPORT_REJECTED">REPORT_REJECTED</option>
+              <option value="REPORT_NOTES_UPDATED">REPORT_NOTES_UPDATED</option>
+              <option value="REPORT_RESTORED">REPORT_RESTORED</option>
+              <option value="REPORT_FILE_ACCESSED">REPORT_FILE_ACCESSED</option>
+              <option value="HANDOVER_COMPLETED">HANDOVER_COMPLETED</option>
+              <option value="REPORT_MARKED_STALE">REPORT_MARKED_STALE</option>
             </select>
           </div>
 

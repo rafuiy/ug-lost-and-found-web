@@ -355,35 +355,47 @@ function DrawerContent({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="bg-sheet border-[1.5px] border-line-strong rounded-[4px] p-3 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 bg-paper rounded-[3px] border border-line-strong overflow-hidden shrink-0">
-                        <img
-                          src={report.ktmThumbnailUrl}
-                          alt="KTM"
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="w-11 h-11 bg-paper rounded-[3px] border border-line-strong overflow-hidden shrink-0 flex items-center justify-center">
+                        {report.ktmThumbnailUrl ? (
+                          <img
+                            src={report.ktmThumbnailUrl}
+                            alt="KTM"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <LuLock className="size-4 text-ink-3" aria-hidden="true" />
+                        )}
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-ink">Foto KTM</div>
                         <div className="text-[11px] text-ink-3 truncate">
-                          {report.ktmFileName || 'Tervalidasi'}
+                          {report.ktmFileName ||
+                            (report.ktmThumbnailUrl
+                              ? 'Tervalidasi'
+                              : report.hasKtmKrs
+                                ? 'Berkas privat tersedia'
+                                : 'Memuat...')}
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="subtle"
-                      size="sm"
-                      onClick={() =>
-                        onOpenSecureFile(
-                          `KTM Pelapor - ${report.reporterName}`,
-                          report.ktmThumbnailUrl,
-                          'ktm'
-                        )
-                      }
-                      className="shrink-0"
-                    >
-                      <LuEye className="size-4" aria-hidden="true" />
-                      <span>Buka</span>
-                    </Button>
+                    {(report.ktmThumbnailUrl || report.hasKtmKrs) && (
+                      <Button
+                        variant="subtle"
+                        size="sm"
+                        disabled={!report.ktmThumbnailUrl}
+                        onClick={() =>
+                          onOpenSecureFile(
+                            `KTM Pelapor - ${report.reporterName}`,
+                            report.ktmThumbnailUrl,
+                            'ktm'
+                          )
+                        }
+                        className="shrink-0"
+                      >
+                        <LuEye className="size-4" aria-hidden="true" />
+                        <span>Buka</span>
+                      </Button>
+                    )}
                   </div>
 
                   <div className="bg-sheet border-[1.5px] border-line-strong rounded-[4px] p-3 flex items-center justify-between gap-2">
@@ -1000,7 +1012,7 @@ export const AdminReviewDrawer = ({
 
   return (
     <DrawerContent
-      key={report.ticketCode}
+      key={`${report.ticketCode}-${report.detailLoaded ? 'full' : 'summary'}`}
       report={report}
       reports={reports}
       onClose={onClose}

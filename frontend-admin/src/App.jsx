@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   INITIAL_REPORTS,
   INITIAL_INVENTORY,
@@ -20,7 +20,22 @@ import {
   clearStoredSession,
   getStoredSession,
   isHighPrivilegeOfficer,
+  logoutOfficer,
 } from './services/auth';
+import { API_MOCK } from './services/httpClient';
+import {
+  createHandover,
+  createInventory,
+  deleteInventory,
+  fetchAuditLogs,
+  fetchInventories,
+  fetchReportDetailWithFiles,
+  fetchReports,
+  restoreStaleReport,
+  updateInventory,
+  updateReportNotes,
+  updateReportStatus,
+} from './services/adminApi';
 import { LuLogOut } from 'react-icons/lu';
 
 const ADMIN_TAB_PATHS = {
@@ -47,6 +62,7 @@ export function App() {
   const [reports, setReports] = useState(INITIAL_REPORTS);
   const [inventoryList, setInventoryList] = useState(INITIAL_INVENTORY);
   const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
+  const [apiReportCounts, setApiReportCounts] = useState(null);
   const [toasts, setToasts] = useState([]);
 
   const [activeFilterTab, setActiveFilterTab] = useState('Semua');
@@ -102,7 +118,7 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const addToast = (type, title, message) => {
+  const addToast = useCallback((type, title, message) => {
     const newToast = {
       id: `toast-${Date.now()}-${Math.random()}`,
       type,
@@ -113,7 +129,65 @@ export function App() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== newToast.id));
     }, 4500);
-  };
+  }, []);
+
+  const isMockMode = API_MOCK || Boolean(currentOfficer?.isMock);
+
+  const refreshAdminData = useCallback(async () => {
+    if (!currentOfficer || isMockMode) return;
+    const tasks = [fetchReports(), fetchInventories()];
+    if (isHighPrivilege) {
+      tasks.push(fetchAuditLogs());
+    }
+    const [reportsRes, inventoriesRes, auditRes] = await Promise.allSettled(tasks);
+
+    if (reportsRes.status === 'fulfilled') {
+      setReports(reportsRes.value.rows);
+      setApiReportCounts(reportsRes.value.counts);
+    }
+    if (inventoriesRes.status === 'fulfilled') {
+      setInventoryList(inventoriesRes.value);
+    }
+    if (isHighPrivilege && auditRes?.status === 'fulfilled') {
+      setAuditLogs(auditRes.value);
+    }
+  }, [currentOfficer, isMockMode, isHighPrivilege]);
+
+  useEffect(() => {
+    if (!currentOfficer || isMockMode) return;
+    let active = true;
+    const loadInitial = async () => {
+      try {
+        await refreshAdminData();
+      } catch (err) {
+        if (active) {
+          addToast('error', 'Gagal Memuat Data API', err?.message || 'Tidak dapat memuat data backend.');
+        }
+      }
+    };
+    loadInitial();
+    return () => {
+      active = false;
+    };
+  }, [currentOfficer, isMockMode, refreshAdminData, addToast]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearStoredSession();
+      setIsLogoutModalOpen(false);
+      setIsDrawerOpen(false);
+      setSecureFileModal((prev) => ({ ...prev, isOpen: false }));
+      setActiveJsonLog(null);
+      setSelectedTicketCode(null);
+      setCurrentOfficer(null);
+      setLoginNotice('Sesi Anda telah berakhir. Silakan login kembali.');
+      if (window.location.pathname !== '/login') {
+        window.history.pushState({}, '', '/login');
+      }
+    };
+    window.addEventListener('uglf:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('uglf:unauthorized', handleUnauthorized);
+  }, []);
 
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -149,9 +223,20 @@ export function App() {
     ? reports.find((r) => r.ticketCode === selectedTicketCode) || null
     : null;
 
-  const handleReviewReport = (report) => {
+  const handleReviewReport = async (report) => {
     setSelectedTicketCode(report.ticketCode);
     setIsDrawerOpen(true);
+
+    if (!isMockMode && !report.detailLoaded) {
+      try {
+        const detail = await fetchReportDetailWithFiles(report.ticketCode);
+        setReports((prev) =>
+          prev.map((r) => (r.ticketCode === report.ticketCode ? { ...r, ...detail } : r))
+        );
+      } catch (err) {
+        addToast('error', 'Gagal Memuat Detail', err?.message || 'Tidak dapat memuat detail tiket.');
+      }
+    }
   };
 
   const handleOpenSecureFile = (title, url, type) => {
@@ -167,8 +252,27 @@ export function App() {
     });
   };
 
-  const handleIssueInvitation = (reportCode, matchedInventoryId, notes) => {
+  const handleIssueInvitation = async (reportCode, matchedInventoryId, notes) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
+    if (!isMockMode) {
+      try {
+        await updateReportStatus(reportCode, {
+          status: 'Perlu Verifikasi',
+          matchedInventoryId,
+          adminNotes: notes,
+        });
+        await refreshAdminData();
+        addToast(
+          'success',
+          'Undangan Loket Diterbitkan',
+          `Status tiket ${reportCode} kini 'Perlu Verifikasi'. Email dikirim ke ${target?.reporterEmail || 'pelapor'}.`
+        );
+      } catch (err) {
+        addToast('error', 'Gagal Menerbitkan Undangan', err?.message || 'Gagal memperbarui status.');
+      }
+      return;
+    }
+
     setReports((prev) =>
       prev.map((r) =>
         r.ticketCode === reportCode
@@ -199,8 +303,22 @@ export function App() {
     );
   };
 
-  const handleRejectReport = (reportCode, reason) => {
+  const handleRejectReport = async (reportCode, reason) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
+    if (!isMockMode) {
+      try {
+        await updateReportStatus(reportCode, {
+          status: 'Ditolak',
+          rejectionReason: reason,
+        });
+        await refreshAdminData();
+        addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
+      } catch (err) {
+        addToast('error', 'Gagal Menolak Laporan', err?.message || 'Gagal menolak laporan.');
+      }
+      return;
+    }
+
     setReports((prev) =>
       prev.map((r) =>
         r.ticketCode === reportCode
@@ -226,10 +344,25 @@ export function App() {
     addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
   };
 
-  const handleRestoreStaleReport = (reportCode) => {
+  const handleRestoreStaleReport = async (reportCode) => {
     const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
       currentOfficer?.id || 'ADM-04D'
     })`;
+    if (!isMockMode) {
+      try {
+        await restoreStaleReport(reportCode);
+        await refreshAdminData();
+        addToast(
+          'success',
+          'Laporan Lawas Dipulihkan',
+          `Tiket ${reportCode} dikembalikan ke antrean aktif.`
+        );
+      } catch (err) {
+        addToast('error', 'Gagal Memulihkan Laporan', err?.message || 'Aksi gagal diproses.');
+      }
+      return;
+    }
+
     setReports((prev) =>
       prev.map((r) =>
         r.ticketCode === reportCode
@@ -259,11 +392,33 @@ export function App() {
     );
   };
 
-  const handleRevertToUnmatched = (reportCode, reason) => {
+  const handleRevertToUnmatched = async (reportCode, reason) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
     const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
       currentOfficer?.id || 'ADM-04D'
     })`;
+
+    if (!isMockMode) {
+      try {
+        const nextNotes = `${
+          target?.adminNotes ? target.adminNotes + ' | ' : ''
+        }Verifikasi loket gagal (${reason}) — dikembalikan ke Belum Ada.`;
+        await updateReportStatus(reportCode, {
+          status: 'Belum Ada',
+          matchedInventoryId: '',
+          adminNotes: nextNotes,
+        });
+        await refreshAdminData();
+        addToast(
+          'warning',
+          'Dikembalikan ke Belum Ada',
+          `Tiket ${reportCode} dikembalikan ke antrean. Inventori tetap Tersimpan.`
+        );
+      } catch (err) {
+        addToast('error', 'Gagal Mengembalikan Tiket', err?.message || 'Transisi status ditolak.');
+      }
+      return;
+    }
 
     setReports((prev) =>
       prev.map((r) =>
@@ -297,7 +452,7 @@ export function App() {
     );
   };
 
-  const handleReopenRejectedReport = (reportCode, { reason }) => {
+  const handleReopenRejectedReport = async (reportCode, { reason }) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
     const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
       currentOfficer?.id || 'ADM-04D'
@@ -306,6 +461,30 @@ export function App() {
       .toString(36)
       .toUpperCase()}`;
     const resubmitLink = `/lapor?reopen=${resubmitToken}`;
+
+    if (!isMockMode) {
+      try {
+        await updateReportStatus(reportCode, {
+          status: 'Dibatalkan',
+          adminNotes: `${
+            target?.adminNotes ? target.adminNotes + ' | ' : ''
+          }Status Ditolak dibatalkan menjadi Dibatalkan (${reason}).`,
+        });
+        await refreshAdminData();
+        addToast(
+          'success',
+          'Status Ditolak → Dibatalkan',
+          `Tiket ${reportCode} diubah menjadi Dibatalkan.`
+        );
+      } catch (err) {
+        addToast(
+          'error',
+          'Belum Didukung Backend',
+          err?.message || 'Backend saat ini belum membuka transisi Ditolak → Dibatalkan.'
+        );
+      }
+      return;
+    }
 
     setReports((prev) =>
       prev.map((r) =>
@@ -344,7 +523,7 @@ export function App() {
     );
   };
 
-  const handleVoidHandover = (
+  const handleVoidHandover = async (
     reportCode,
     { reason, restoreInventory, includeResubmitLink }
   ) => {
@@ -358,6 +537,30 @@ export function App() {
           .toString(36)
           .toUpperCase()}`
       : null;
+
+    if (!isMockMode) {
+      try {
+        await updateReportStatus(reportCode, {
+          status: 'Dibatalkan',
+          adminNotes: `${
+            target?.adminNotes ? target.adminNotes + ' | ' : ''
+          }Status Selesai dibatalkan menjadi Dibatalkan (${reason}).`,
+        });
+        await refreshAdminData();
+        addToast(
+          'warning',
+          'Status Selesai → Dibatalkan',
+          `Tiket ${reportCode} diubah menjadi Dibatalkan.`
+        );
+      } catch (err) {
+        addToast(
+          'error',
+          'Belum Didukung Backend',
+          err?.message || 'Backend saat ini belum membuka void/revert untuk status Selesai.'
+        );
+      }
+      return;
+    }
 
     setReports((prev) =>
       prev.map((r) =>
@@ -415,14 +618,27 @@ export function App() {
     );
   };
 
-  const handleSaveNotes = (reportCode, notes) => {
+  const handleSaveNotes = async (reportCode, notes) => {
+    if (!isMockMode) {
+      try {
+        await updateReportNotes(reportCode, { adminNotes: notes });
+        setReports((prev) =>
+          prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
+        );
+        addToast('info', 'Catatan Disimpan', `Catatan internal tiket ${reportCode} diperbarui.`);
+      } catch (err) {
+        addToast('error', 'Gagal Menyimpan Catatan', err?.message || 'Gagal menyimpan catatan.');
+      }
+      return;
+    }
+
     setReports((prev) =>
       prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
     );
     addToast('info', 'Catatan Disimpan', `Catatan internal tiket ${reportCode} diperbarui.`);
   };
 
-  const handleCompleteHandover = (params) => {
+  const handleCompleteHandover = async (params) => {
     const target = reports.find((r) => r.ticketCode === params.ticketCode);
     if (!target || target.status !== 'Perlu Verifikasi') {
       addToast(
@@ -430,7 +646,23 @@ export function App() {
         'Serah Terima Ditolak',
         'Hanya tiket berstatus Perlu Verifikasi yang dapat diserahterimakan.'
       );
-      return;
+      return false;
+    }
+
+    if (!isMockMode) {
+      try {
+        await createHandover(params);
+        await refreshAdminData();
+        addToast(
+          'success',
+          'Serah Terima Sukses',
+          `Tiket ${params.ticketCode} resmi 'Selesai' & inventori diubah menjadi 'Diambil'.`
+        );
+        return true;
+      } catch (err) {
+        addToast('error', 'Serah Terima Gagal', err?.message || 'Gagal memproses serah terima.');
+        return false;
+      }
     }
 
     const matchedInvId = params.inventoryId || target.matchedInventoryId;
@@ -486,6 +718,7 @@ export function App() {
       'Serah Terima Sukses',
       `Tiket ${params.ticketCode} resmi 'Selesai' & inventori diubah menjadi 'Diambil'.`
     );
+    return true;
   };
 
   const handleGoToHandoverFromDrawer = (ticketCode) => {
@@ -497,9 +730,8 @@ export function App() {
   const handleSelectToMatchFromInventory = (inventoryId) => {
     const matched = reports.find((r) => r.matchedInventoryId === inventoryId);
     if (matched) {
-      setSelectedTicketCode(matched.ticketCode);
-      setIsDrawerOpen(true);
       handleSelectTab('queue');
+      handleReviewReport(matched);
     } else {
       handleSelectTab('queue');
       addToast(
@@ -510,7 +742,22 @@ export function App() {
     }
   };
 
-  const handleCreateInventory = (newItem) => {
+  const handleCreateInventory = async (newItem) => {
+    if (!isMockMode) {
+      try {
+        const created = await createInventory(newItem);
+        await refreshAdminData();
+        addToast(
+          'success',
+          'Inventori Ditambahkan',
+          `[${created.id}] ${created.title} tersimpan di ${created.storageLocker}.`
+        );
+      } catch (err) {
+        addToast('error', 'Gagal Menambah Inventori', err?.message || 'Gagal menyimpan inventori.');
+      }
+      return;
+    }
+
     setInventoryList((prev) => [newItem, ...prev]);
 
     appendAuditLog('INV_CREATE', `inventories: ${newItem.id}`, newItem.id, {
@@ -533,7 +780,22 @@ export function App() {
     );
   };
 
-  const handleUpdateInventory = (updatedItem) => {
+  const handleUpdateInventory = async (updatedItem) => {
+    if (!isMockMode) {
+      try {
+        await updateInventory(updatedItem.id, updatedItem);
+        await refreshAdminData();
+        addToast(
+          'info',
+          'Inventori Diperbarui',
+          `Detail barang [${updatedItem.id}] berhasil disimpan.`
+        );
+      } catch (err) {
+        addToast('error', 'Gagal Memperbarui Inventori', err?.message || 'Gagal menyimpan perubahan.');
+      }
+      return;
+    }
+
     setInventoryList((prev) =>
       prev.map((inv) =>
         inv.id === updatedItem.id && inv.status === 'Tersimpan' ? updatedItem : inv
@@ -560,7 +822,22 @@ export function App() {
     );
   };
 
-  const handleDeleteInventory = (inventoryId, reason) => {
+  const handleDeleteInventory = async (inventoryId, reason) => {
+    if (!isMockMode) {
+      try {
+        await deleteInventory(inventoryId, { reason, confirmId: inventoryId });
+        await refreshAdminData();
+        addToast('warning', 'Inventori Dihapus', `Barang [${inventoryId}] berhasil dihapus.`);
+      } catch (err) {
+        addToast(
+          'error',
+          'Hapus Inventori Belum Didukung Backend',
+          err?.message || 'Endpoint DELETE /api/v1/admin/inventories/:id belum tersedia di backend.'
+        );
+      }
+      return;
+    }
+
     const targetItem = inventoryList.find((inv) => inv.id === inventoryId);
     const linkedReport = reports.find((r) => r.matchedInventoryId === inventoryId);
     const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
@@ -625,13 +902,17 @@ export function App() {
     addToast('success', 'Sesi Dimulai', `Selamat bertugas, ${officer.name} (${officer.id}).`);
   };
 
-  const handleConfirmLogout = () => {
-    clearStoredSession();
+  const handleConfirmLogout = async () => {
+    await logoutOfficer();
     setIsLogoutModalOpen(false);
     setIsDrawerOpen(false);
     setSecureFileModal((prev) => ({ ...prev, isOpen: false }));
     setActiveJsonLog(null);
     setSelectedTicketCode(null);
+    setApiReportCounts(null);
+    setReports(INITIAL_REPORTS);
+    setInventoryList(INITIAL_INVENTORY);
+    setAuditLogs(INITIAL_AUDIT_LOGS);
     setCurrentOfficer(null);
     setLoginNotice('Sesi petugas telah diakhiri. Silakan masuk kembali untuk mengakses panel.');
     if (window.location.pathname !== '/login') {
@@ -648,14 +929,24 @@ export function App() {
     );
   }
 
-  const statsCounts = {
-    belumAda: reports.filter((r) => r.status === 'Belum Ada').length,
-    perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
-    lawas: reports.filter((r) => r.isStale).length,
-    selesai: reports.filter((r) => r.status === 'Selesai').length,
-    ditolak: reports.filter((r) => r.status === 'Ditolak').length,
-    dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
-  };
+  const statsCounts =
+    !isMockMode && apiReportCounts
+      ? {
+          belumAda: apiReportCounts.belum_ada ?? 0,
+          perluVerifikasi: apiReportCounts.perlu_verifikasi ?? 0,
+          lawas: apiReportCounts.lawas ?? 0,
+          selesai: apiReportCounts.selesai ?? 0,
+          ditolak: apiReportCounts.ditolak ?? 0,
+          dibatalkan: apiReportCounts.dibatalkan ?? 0,
+        }
+      : {
+          belumAda: reports.filter((r) => r.status === 'Belum Ada').length,
+          perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
+          lawas: reports.filter((r) => r.isStale).length,
+          selesai: reports.filter((r) => r.status === 'Selesai').length,
+          ditolak: reports.filter((r) => r.status === 'Ditolak').length,
+          dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
+        };
 
   return (
     <div className="min-h-svh bg-paper text-ink flex flex-col font-sans">

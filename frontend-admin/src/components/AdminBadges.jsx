@@ -48,6 +48,19 @@ const AUDIT_COLORS = {
   STATUS_REVERT: 'text-gold-ink',
   HANDOVER_VOID: 'text-danger',
   INV_DELETE: 'text-danger',
+  AUTH_LOGIN_SUCCESS: 'text-ok',
+  AUTH_LOGIN_FAILED: 'text-danger',
+  AUTH_LOGOUT: 'text-ink-2',
+  INVENTORY_CREATED: 'text-ug-700',
+  INVENTORY_UPDATED: 'text-ug-800',
+  REPORT_CREATED: 'text-ug-700',
+  REPORT_STATUS_UPDATED: 'text-ug-700',
+  REPORT_REJECTED: 'text-danger',
+  REPORT_NOTES_UPDATED: 'text-ink-2',
+  REPORT_RESTORED: 'text-ug-700',
+  REPORT_FILE_ACCESSED: 'text-gold-ink',
+  HANDOVER_COMPLETED: 'text-ok',
+  REPORT_MARKED_STALE: 'text-gold-ink',
 };
 
 export const AuditBadge = ({ action }) => {
