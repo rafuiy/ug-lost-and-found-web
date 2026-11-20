@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StatusStamp } from './ui/Stamp';
+import { StatusBadge } from './AdminBadges';
 import { Button } from './ui/Button';
 import { INPUT_CLASS, LABEL_CLASS } from './ui/styles';
 import {
@@ -18,6 +18,7 @@ import {
   LuSave,
   LuEye,
   LuClock,
+  LuRotateCcw,
 } from 'react-icons/lu';
 
 function formatPhoneForWa(phone) {
@@ -32,8 +33,11 @@ function DrawerContent({
   report,
   onClose,
   inventoryList,
+  canRestoreStale,
   onIssueInvitation,
   onRejectReport,
+  onRestoreStaleReport,
+  onRevertToUnmatched,
   onSaveNotes,
   onOpenSecureFile,
   onGoToHandover,
@@ -46,6 +50,10 @@ function DrawerContent({
   const [rejectPrompt, setRejectPrompt] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
+  const [restoreConfirm, setRestoreConfirm] = useState(false);
+  const [revertPrompt, setRevertPrompt] = useState(false);
+  const [revertReason, setRevertReason] = useState('');
+  const [revertError, setRevertError] = useState('');
 
   const availableInventory = inventoryList.filter(
     (item) => item.status === 'Tersimpan' || item.id === report.matchedInventoryId
@@ -73,6 +81,22 @@ function DrawerContent({
     setRejectPrompt(false);
   };
 
+  const handleExecuteRevert = () => {
+    if (!revertReason.trim()) {
+      setRevertError('Mohon cantumkan alasan verifikasi loket gagal.');
+      return;
+    }
+    setRevertError('');
+    onRevertToUnmatched?.(report.ticketCode, revertReason.trim());
+    setRevertPrompt(false);
+    setRevertReason('');
+  };
+
+  const handleExecuteRestore = () => {
+    onRestoreStaleReport?.(report.ticketCode);
+    setRestoreConfirm(false);
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="absolute inset-0 bg-ug-950/55 transition-opacity" onClick={onClose} />
@@ -89,7 +113,7 @@ function DrawerContent({
                 <h2 className="text-base font-bold text-sheet tracking-tight">
                   Review Pengaduan
                 </h2>
-                <StatusStamp status={report.status} size="sm" className="bg-sheet" />
+                <StatusBadge status={report.status} />
                 {report.isStale && (
                   <span className="inline-flex items-center gap-1 text-xs font-bold text-gold">
                     <LuClock className="size-4" aria-hidden="true" />
@@ -403,6 +427,105 @@ function DrawerContent({
                 </div>
               </div>
 
+              {report.isStale &&
+                canRestoreStale &&
+                report.status !== 'Selesai' &&
+                report.status !== 'Ditolak' && (
+                  <div className="rounded-[5px] border-[1.5px] border-gold-ink/40 bg-gold-wash p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.06em] text-gold-ink flex items-center gap-1.5">
+                          <LuClock className="size-4 shrink-0" aria-hidden="true" />
+                          <span>Laporan Lawas (&gt;30 Hari)</span>
+                        </p>
+                        <p className="text-xs text-ink-2 mt-1 leading-relaxed">
+                          Laporan melewati ambang 30 hari. Pulihkan ke antrean aktif jika ada
+                          barang temuan baru atau pelapor melakukan konfirmasi ulang.
+                        </p>
+                      </div>
+                      {!restoreConfirm && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRestoreConfirm(true)}
+                          className="shrink-0"
+                        >
+                          <LuRotateCcw className="size-4" aria-hidden="true" />
+                          <span>Pulihkan Laporan Lawas</span>
+                        </Button>
+                      )}
+                    </div>
+
+                    {restoreConfirm && (
+                      <div className="pt-2.5 border-t border-gold-ink/25 flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-ink">
+                          Konfirmasi pulihkan tiket {report.ticketCode} ke antrean aktif?
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => setRestoreConfirm(false)}
+                          >
+                            Batal
+                          </Button>
+                          <Button variant="ug" size="sm" onClick={handleExecuteRestore}>
+                            Ya, Pulihkan Laporan
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {revertPrompt && (
+                <div className="rounded-[5px] border-[1.5px] border-gold-ink bg-gold-wash p-4 space-y-3">
+                  <label
+                    htmlFor="drawer-revert-reason"
+                    className="text-xs font-bold text-gold-ink block"
+                  >
+                    Alasan Verifikasi Loket Gagal ({report.ticketCode}):
+                  </label>
+                  <p className="text-xs text-ink-2">
+                    Status laporan akan dikembalikan ke <strong>Belum Ada</strong> dan inventori
+                    fisik tetap berstatus <strong>Tersimpan</strong>.
+                  </p>
+                  <input
+                    id="drawer-revert-reason"
+                    type="text"
+                    value={revertReason}
+                    onChange={(e) => {
+                      setRevertReason(e.target.value);
+                      if (revertError) setRevertError('');
+                    }}
+                    placeholder="Contoh: Ciri khusus tidak sesuai / pelapor gagal membawa KTM asli"
+                    aria-invalid={revertError ? true : undefined}
+                    className={`${INPUT_CLASS} h-10 ${revertError ? 'border-danger' : ''}`}
+                  />
+                  {revertError && (
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-danger">
+                      <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                      <span>{revertError}</span>
+                    </p>
+                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="subtle"
+                      size="sm"
+                      onClick={() => {
+                        setRevertPrompt(false);
+                        setRevertError('');
+                      }}
+                    >
+                      Batal
+                    </Button>
+                    <Button variant="ug" size="sm" onClick={handleExecuteRevert}>
+                      Ya, Kembalikan ke Belum Ada
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {rejectPrompt && (
                 <div className="rounded-[5px] border-2 border-danger bg-danger-wash p-4 space-y-3">
                   <label
@@ -451,11 +574,15 @@ function DrawerContent({
 
           {/* Sticky Bottom Bar */}
           <div className="p-4 sm:p-5 bg-sheet border-t-[1.5px] border-line-strong shrink-0 space-y-2.5">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               <Button
                 variant="gold"
                 size="md"
-                disabled={report.status === 'Perlu Verifikasi' || report.status === 'Selesai'}
+                disabled={
+                  report.status === 'Perlu Verifikasi' ||
+                  report.status === 'Selesai' ||
+                  report.status === 'Ditolak'
+                }
                 onClick={handleIssueInvitation}
                 className="flex-1"
               >
@@ -467,11 +594,29 @@ function DrawerContent({
                 </span>
               </Button>
 
+              {report.status === 'Perlu Verifikasi' && onRevertToUnmatched && (
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    setRevertPrompt(true);
+                    setRejectPrompt(false);
+                  }}
+                  className="shrink-0"
+                >
+                  <LuRotateCcw className="size-4" aria-hidden="true" />
+                  <span>Kembalikan</span>
+                </Button>
+              )}
+
               <Button
                 variant="danger"
                 size="md"
                 disabled={report.status === 'Ditolak' || report.status === 'Selesai'}
-                onClick={() => setRejectPrompt(true)}
+                onClick={() => {
+                  setRejectPrompt(true);
+                  setRevertPrompt(false);
+                }}
                 className="shrink-0"
               >
                 Tolak Laporan
@@ -493,8 +638,11 @@ export const AdminReviewDrawer = ({
   isOpen,
   onClose,
   inventoryList,
+  canRestoreStale = false,
   onIssueInvitation,
   onRejectReport,
+  onRestoreStaleReport,
+  onRevertToUnmatched,
   onSaveNotes,
   onOpenSecureFile,
   onGoToHandover,
@@ -507,8 +655,11 @@ export const AdminReviewDrawer = ({
       report={report}
       onClose={onClose}
       inventoryList={inventoryList}
+      canRestoreStale={canRestoreStale}
       onIssueInvitation={onIssueInvitation}
       onRejectReport={onRejectReport}
+      onRestoreStaleReport={onRestoreStaleReport}
+      onRevertToUnmatched={onRevertToUnmatched}
       onSaveNotes={onSaveNotes}
       onOpenSecureFile={onOpenSecureFile}
       onGoToHandover={onGoToHandover}
