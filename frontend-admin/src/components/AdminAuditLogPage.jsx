@@ -13,15 +13,41 @@ import {
   LuCircleCheck,
 } from 'react-icons/lu';
 
+function parseWibTimestamp(ts) {
+  if (!ts) return 0;
+  const cleaned = ts.replace(' WIB', '').trim().replace(' ', 'T');
+  const ms = Date.parse(cleaned);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
 export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
   const [selectedAction, setSelectedAction] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('ALL');
 
   const filteredLogs = useMemo(() => {
+    if (logs.length === 0) return [];
+    const refMs = logs.reduce((max, l) => Math.max(max, parseWibTimestamp(l.timestamp)), 0);
+    const refDay = refMs ? new Date(refMs).toDateString() : '';
+
     return logs.filter((log) => {
       if (selectedAction !== 'ALL' && log.action !== selectedAction) {
         return false;
+      }
+
+      if (dateFilter !== 'ALL' && refMs) {
+        const logMs = parseWibTimestamp(log.timestamp);
+        if (logMs) {
+          if (dateFilter === 'TODAY' && new Date(logMs).toDateString() !== refDay) {
+            return false;
+          }
+          if (dateFilter === '7D' && refMs - logMs > 7 * 86400000) {
+            return false;
+          }
+          if (dateFilter === '30D' && refMs - logMs > 30 * 86400000) {
+            return false;
+          }
+        }
       }
 
       if (searchQuery.trim()) {
@@ -38,7 +64,7 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
 
       return true;
     });
-  }, [logs, selectedAction, searchQuery]);
+  }, [logs, selectedAction, dateFilter, searchQuery]);
 
   const handleExportCsv = () => {
     const headers = ['ID', 'Timestamp', 'Petugas', 'Admin ID', 'Aksi', 'Target', 'IP Address'];
@@ -128,6 +154,8 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
               <option value="INV_UPDATE">INV_UPDATE</option>
               <option value="STALE_RESTORE">STALE_RESTORE</option>
               <option value="STATUS_REVERT">STATUS_REVERT</option>
+              <option value="HANDOVER_VOID">HANDOVER_VOID</option>
+              <option value="INV_DELETE">INV_DELETE</option>
             </select>
           </div>
 
