@@ -27,11 +27,17 @@ export const AdminReportQueue = ({
   onReviewReport,
   activeFilterTab,
   onFilterTabChange,
+  onlyStale: controlledOnlyStale,
+  onOnlyStaleChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [onlyStale, setOnlyStale] = useState(false);
+  const [internalOnlyStale, setInternalOnlyStale] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(() => formatWibTime(new Date()));
+
+  const onlyStale =
+    controlledOnlyStale !== undefined ? controlledOnlyStale : internalOnlyStale;
+  const setOnlyStale = onOnlyStaleChange || setInternalOnlyStale;
 
   const handleRefresh = () => {
     setLastUpdated(formatWibTime(new Date()));

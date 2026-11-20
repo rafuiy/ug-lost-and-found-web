@@ -31,6 +31,7 @@ function formatPhoneForWa(phone) {
 
 function DrawerContent({
   report,
+  reports = [],
   onClose,
   inventoryList,
   canRestoreStale,
@@ -47,6 +48,7 @@ function DrawerContent({
   const [selectedInventoryId, setSelectedInventoryId] = useState(
     report.matchedInventoryId || ''
   );
+  const [inviteError, setInviteError] = useState('');
   const [adminNotes, setAdminNotes] = useState(report.adminNotes || '');
   const [notesSaved, setNotesSaved] = useState(false);
   const [rejectPrompt, setRejectPrompt] = useState(false);
@@ -69,6 +71,24 @@ function DrawerContent({
     (item) => item.status === 'Tersimpan' || item.id === report.matchedInventoryId
   );
 
+  const lockedByOtherTicket = reports.reduce((acc, r) => {
+    if (
+      r.ticketCode !== report.ticketCode &&
+      r.status === 'Perlu Verifikasi' &&
+      r.matchedInventoryId
+    ) {
+      acc[r.matchedInventoryId] = r.ticketCode;
+    }
+    return acc;
+  }, {});
+
+  const sameCategoryInventory = availableInventory.filter(
+    (item) => item.category === report.category
+  );
+  const otherCategoryInventory = availableInventory.filter(
+    (item) => item.category !== report.category
+  );
+
   const matchedInventory = inventoryList.find((item) => item.id === selectedInventoryId);
 
   const handleSaveNotes = () => {
@@ -78,6 +98,19 @@ function DrawerContent({
   };
 
   const handleIssueInvitation = () => {
+    if (!selectedInventoryId) {
+      setInviteError(
+        'Pilih barang temuan fisik dari inventori terlebih dahulu sebelum menerbitkan undangan.'
+      );
+      return;
+    }
+    if (lockedByOtherTicket[selectedInventoryId]) {
+      setInviteError(
+        `Barang [${selectedInventoryId}] sedang diverifikasi untuk tiket ${lockedByOtherTicket[selectedInventoryId]}.`
+      );
+      return;
+    }
+    setInviteError('');
     onIssueInvitation(report.ticketCode, selectedInventoryId, adminNotes);
   };
 
@@ -416,21 +449,54 @@ function DrawerContent({
                 <select
                   id="drawer-inventory-select"
                   value={selectedInventoryId}
-                  onChange={(e) => setSelectedInventoryId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedInventoryId(e.target.value);
+                    if (inviteError) setInviteError('');
+                  }}
                   disabled={
                     report.status === 'Selesai' ||
                     report.status === 'Ditolak' ||
                     report.status === 'Dibatalkan'
                   }
-                  className={`${INPUT_CLASS} h-11 font-semibold tabular-nums disabled:opacity-60 disabled:cursor-not-allowed`}
+                  aria-invalid={inviteError ? true : undefined}
+                  className={`${INPUT_CLASS} h-11 font-semibold tabular-nums disabled:opacity-60 disabled:cursor-not-allowed ${
+                    inviteError ? 'border-danger' : ''
+                  }`}
                 >
                   <option value="">-- Belum Dipilih / Tidak Ada Temuan Cocok --</option>
-                  {availableInventory.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      [{item.id}] {item.title} — {item.foundLocation} ({item.foundDate})
-                    </option>
-                  ))}
+                  {sameCategoryInventory.length > 0 && (
+                    <optgroup label={`Sesuai Kategori (${report.category})`}>
+                      {sameCategoryInventory.map((item) => {
+                        const lockedTicket = lockedByOtherTicket[item.id];
+                        return (
+                          <option key={item.id} value={item.id} disabled={Boolean(lockedTicket)}>
+                            [{item.id}] {item.title} — {item.foundLocation} ({item.foundDate})
+                            {lockedTicket ? ` · Sedang Diverifikasi (${lockedTicket})` : ''}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                  {otherCategoryInventory.length > 0 && (
+                    <optgroup label="Kategori Lainnya">
+                      {otherCategoryInventory.map((item) => {
+                        const lockedTicket = lockedByOtherTicket[item.id];
+                        return (
+                          <option key={item.id} value={item.id} disabled={Boolean(lockedTicket)}>
+                            [{item.id}] {item.title} — {item.foundLocation} ({item.foundDate})
+                            {lockedTicket ? ` · Sedang Diverifikasi (${lockedTicket})` : ''}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
                 </select>
+                {inviteError && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger">
+                    <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                    <span>{inviteError}</span>
+                  </p>
+                )}
               </div>
 
               {matchedInventory ? (
@@ -915,6 +981,7 @@ function DrawerContent({
 
 export const AdminReviewDrawer = ({
   report,
+  reports = [],
   isOpen,
   onClose,
   inventoryList,
@@ -935,6 +1002,7 @@ export const AdminReviewDrawer = ({
     <DrawerContent
       key={report.ticketCode}
       report={report}
+      reports={reports}
       onClose={onClose}
       inventoryList={inventoryList}
       canRestoreStale={canRestoreStale}

@@ -50,6 +50,7 @@ export function App() {
   const [toasts, setToasts] = useState([]);
 
   const [activeFilterTab, setActiveFilterTab] = useState('Semua');
+  const [onlyStaleFilter, setOnlyStaleFilter] = useState(false);
   const [selectedTicketCode, setSelectedTicketCode] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [handoverPreloadTicket, setHandoverPreloadTicket] = useState('');
@@ -691,13 +692,21 @@ export function App() {
               </span>
             </div>
 
-            <AdminStatsCards counts={statsCounts} />
+            <AdminStatsCards
+              counts={statsCounts}
+              activeFilterTab={activeFilterTab}
+              onlyStale={onlyStaleFilter}
+              onSelectStatus={setActiveFilterTab}
+              onToggleStale={() => setOnlyStaleFilter((prev) => !prev)}
+            />
 
             <AdminReportQueue
               reports={reports}
               onReviewReport={handleReviewReport}
               activeFilterTab={activeFilterTab}
               onFilterTabChange={setActiveFilterTab}
+              onlyStale={onlyStaleFilter}
+              onOnlyStaleChange={setOnlyStaleFilter}
             />
           </div>
         )}
@@ -743,6 +752,7 @@ export function App() {
 
       <AdminReviewDrawer
         report={selectedReport}
+        reports={reports}
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         inventoryList={inventoryList}
