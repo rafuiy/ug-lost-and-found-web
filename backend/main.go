@@ -1,44 +1,64 @@
 package main
 
 import (
+	"context"
+	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"backend/config"
 	"backend/models"
 	"backend/routes"
-
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/joho/godotenv"
+	"backend/seeders"
+	"backend/services"
 )
 
 func main() {
-	godotenv.Load()
-
-	app := fiber.New()
-
-	// CORS middleware
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
-		AllowMethods:     "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-		AllowCredentials: false,
-	}))
-
-	// Connect database
-	config.ConnectDB()
-
-	// Auto migrate models
-	models.AutoMigrate(config.DB)
-
-	// Setup routes
-	routes.SetupRoutes(app)
-
-	port := os.Getenv("PORT_SERVER")
-	if port == "" {
-		port = ":3001"
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
 
-	println("🚀 Server running at http://localhost" + port)
-	app.Listen(port)
+	db, err := config.ConnectDB(cfg)
+	if err != nil {
+		log.Fatalf("Database connection failed: %v", err)
+	}
+
+	if err := models.AutoMigrate(db); err != nil {
+		log.Fatalf("Auto migration failed: %v", err)
+	}
+
+	if err := seeders.SeedAll(db, cfg); err != nil {
+		log.Fatalf("Database seeding failed: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	staleInterval := time.Duration(cfg.StaleCheckIntervalHours) * time.Hour
+	services.StartStaleScheduler(ctx, db, staleInterval, cfg.StaleThresholdDays)
+
+	app := routes.NewApp(cfg)
+	listenErrCh := make(chan error, 1)
+	go func() {
+		log.Printf("Server running at http://localhost%s", cfg.PortServer)
+		if err := app.Listen(cfg.PortServer); err != nil {
+			listenErrCh <- err
+		}
+		close(listenErrCh)
+	}()
+
+	select {
+	case err := <-listenErrCh:
+		if err != nil {
+			log.Fatalf("Server failed to start: %v", err)
+		}
+	case <-ctx.Done():
+		log.Println("Shutdown signal received, stopping HTTP server...")
+		if err := app.ShutdownWithTimeout(10 * time.Second); err != nil {
+			log.Printf("Server forced shutdown error: %v", err)
+		}
+	}
 }
