@@ -64,7 +64,7 @@ export const AdminStatsCards = ({
       subtitle: 'Diundang ke loket',
       icon: LuShieldCheck,
       valueColor: 'text-ug-700',
-      activeBg: 'bg-ug-100/70 ring-2 ring-inset ring-ug-700',
+      activeBg: 'bg-ug-100/65 ring-1 ring-inset ring-ug-700/40',
       isActive: activeFilterTab === 'Perlu Verifikasi',
       onClick: () => toggleStatus('Perlu Verifikasi'),
     },
@@ -75,7 +75,7 @@ export const AdminStatsCards = ({
       subtitle: 'Perlu tinjauan ulang',
       icon: LuClock,
       valueColor: 'text-gold-ink',
-      activeBg: 'bg-gold-wash ring-2 ring-inset ring-gold-ink',
+      activeBg: 'bg-gold-wash/80 ring-1 ring-inset ring-gold-ink/40',
       isActive: onlyStale,
       onClick: () => onToggleStale?.(),
     },
@@ -89,7 +89,7 @@ export const AdminStatsCards = ({
       subtitle: 'Diserahkan',
       icon: LuCircleCheck,
       valueColor: 'text-ok',
-      activeBg: 'bg-ok-wash/60 ring-2 ring-inset ring-ok',
+      activeBg: 'bg-ok-wash/60 ring-1 ring-inset ring-ok/40',
       isActive: activeFilterTab === 'Selesai',
       onClick: () => toggleStatus('Selesai'),
     },
@@ -100,7 +100,7 @@ export const AdminStatsCards = ({
       subtitle: 'Tidak valid',
       icon: LuCircleX,
       valueColor: 'text-danger',
-      activeBg: 'bg-danger-wash/60 ring-2 ring-inset ring-danger',
+      activeBg: 'bg-danger-wash/60 ring-1 ring-inset ring-danger/40',
       isActive: activeFilterTab === 'Ditolak',
       onClick: () => toggleStatus('Ditolak'),
     },
@@ -111,7 +111,7 @@ export const AdminStatsCards = ({
       subtitle: 'Hasil revert',
       icon: LuRotateCcw,
       valueColor: 'text-ink-2',
-      activeBg: 'bg-paper ring-2 ring-inset ring-ink',
+      activeBg: 'bg-paper ring-1 ring-inset ring-ink-3/45',
       isActive: activeFilterTab === 'Dibatalkan',
       onClick: () => toggleStatus('Dibatalkan'),
     },
@@ -125,7 +125,7 @@ export const AdminStatsCards = ({
         aria-pressed={isQueueActive}
         onClick={() => toggleStatus('Belum Ada')}
         className={`on-ug rounded-[5px] border-[1.5px] border-ug-950 bg-ug-950 text-sheet p-5 flex flex-col justify-between text-left shadow-[3px_3px_0_var(--color-ink)] transition-all cursor-pointer ${
-          isQueueActive ? 'ring-2 ring-gold ring-offset-2 ring-offset-paper' : 'hover:-translate-y-0.5'
+          isQueueActive ? 'ring-1 ring-gold/80' : 'hover:-translate-y-0.5'
         }`}
       >
         <div className="flex items-center justify-between gap-2 w-full flex-wrap">
