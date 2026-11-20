@@ -11,7 +11,6 @@ import {
   LuLock,
   LuPrinter,
   LuArrowLeft,
-  LuImage,
   LuChevronDown,
 } from 'react-icons/lu';
 
@@ -148,13 +147,6 @@ export const AdminHandoverPage = ({
   const selectedInventory =
     availableInventory.find((inv) => inv.id === selectedInventoryId) || null;
 
-  const handleSimulatePhotoUpload = () => {
-    setPhotoFile(null);
-    setPhotoEvidence(
-      'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80'
-    );
-  };
-
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -175,6 +167,7 @@ export const AdminHandoverPage = ({
     secretChecked &&
     recipientName.trim().length > 0 &&
     recipientNpm.trim().length > 0 &&
+    photoFile !== null &&
     photoEvidence.length > 0;
 
   const handleSubmit = async (e) => {
@@ -595,7 +588,10 @@ export const AdminHandoverPage = ({
                       <Button
                         variant="danger"
                         size="sm"
-                        onClick={() => setPhotoEvidence('')}
+                        onClick={() => {
+                          setPhotoEvidence('');
+                          setPhotoFile(null);
+                        }}
                         className="shrink-0"
                       >
                         Hapus
@@ -622,14 +618,6 @@ export const AdminHandoverPage = ({
                             className="hidden"
                           />
                         </label>
-                        <Button
-                          variant="subtle"
-                          size="sm"
-                          onClick={handleSimulatePhotoUpload}
-                        >
-                          <LuImage className="size-4" aria-hidden="true" />
-                          <span>Gunakan Contoh Bukti</span>
-                        </Button>
                       </div>
                     </div>
                   )}

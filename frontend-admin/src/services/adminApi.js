@@ -317,31 +317,11 @@ export async function deleteInventory(id, { reason, confirmId }) {
   });
 }
 
-async function resolveProofFile(photoFile, photoEvidenceUrl) {
-  if (photoFile instanceof File || photoFile instanceof Blob) {
-    return photoFile;
-  }
-  if (photoEvidenceUrl) {
-    try {
-      const res = await fetch(photoEvidenceUrl);
-      if (res.ok) {
-        const blob = await res.blob();
-        if (blob.type.startsWith('image/')) {
-          return new File([blob], 'handover-proof.jpg', { type: blob.type });
-        }
-      }
-    } catch {
-      // Fallback below
-    }
-  }
-  // Minimal 1x1 valid PNG fallback if sample URL cannot be fetched due to offline/CORS
-  const base64Png =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-  const bytes = Uint8Array.from(atob(base64Png), (c) => c.charCodeAt(0));
-  return new File([bytes], 'handover-proof.png', { type: 'image/png' });
-}
-
 export async function createHandover(params) {
+  if (!(params.photoFile instanceof File || params.photoFile instanceof Blob)) {
+    throw new Error('Berkas foto bukti serah terima wajib diunggah.');
+  }
+
   const formData = new FormData();
   formData.append('report_id', params.ticketCode);
   formData.append('inventory_id', params.inventoryId);
@@ -350,9 +330,11 @@ export async function createHandover(params) {
   formData.append('handover_notes', params.notes || '');
   formData.append('ktm_verified', 'true');
   formData.append('secret_traits_verified', 'true');
-
-  const proof = await resolveProofFile(params.photoFile, params.photoEvidence);
-  formData.append('handover_proof', proof, proof.name || 'handover-proof.jpg');
+  formData.append(
+    'handover_proof',
+    params.photoFile,
+    params.photoFile.name || 'handover-proof.jpg'
+  );
 
   const { data } = await request('/admin/handovers', {
     method: 'POST',

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Button } from './ui/Button';
 import { INPUT_CLASS, LABEL_CLASS } from './ui/styles';
-import { authenticateOfficer, DEMO_ACCOUNT } from '../services/auth';
+import { authenticateOfficer } from '../services/auth';
 import {
   LuEye,
   LuEyeOff,
@@ -61,13 +61,6 @@ export const AdminLoginPage = ({ onLoginSuccess, sessionNotice = '' }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleFillDemo = () => {
-    setUsername(DEMO_ACCOUNT.username);
-    setPassword(DEMO_ACCOUNT.password);
-    setFieldErrors({});
-    setAuthError('');
   };
 
   return (
@@ -263,19 +256,6 @@ export const AdminLoginPage = ({ onLoginSuccess, sessionNotice = '' }) => {
                 </Button>
               </div>
             </form>
-
-            <div className="mt-6 pt-4 border-t border-dotted border-line-strong">
-              <div className="rounded-sm border border-line-strong bg-paper px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap text-xs text-ink-2">
-                <div className="tabular-nums">
-                  <span className="font-bold text-ink">Akun demo:</span>{' '}
-                  <span>{DEMO_ACCOUNT.username}</span> ·{' '}
-                  <span>{DEMO_ACCOUNT.password}</span>
-                </div>
-                <Button variant="subtle" size="sm" onClick={handleFillDemo}>
-                  Isi akun demo
-                </Button>
-              </div>
-            </div>
           </div>
         </div>
       </main>

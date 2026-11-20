@@ -1,9 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  INITIAL_REPORTS,
-  INITIAL_INVENTORY,
-  INITIAL_AUDIT_LOGS,
-} from './data/mockData';
 import { AdminNavbar } from './components/AdminNavbar';
 import { AdminStatsCards } from './components/AdminStatsCards';
 import { AdminReportQueue } from './components/AdminReportQueue';
@@ -22,7 +17,6 @@ import {
   isHighPrivilegeOfficer,
   logoutOfficer,
 } from './services/auth';
-import { API_MOCK } from './services/httpClient';
 import {
   createHandover,
   createInventory,
@@ -59,9 +53,9 @@ export function App() {
   const [activeTab, setActiveTab] = useState(() =>
     parseAdminTabFromPath(window.location.pathname)
   );
-  const [reports, setReports] = useState(INITIAL_REPORTS);
-  const [inventoryList, setInventoryList] = useState(INITIAL_INVENTORY);
-  const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
+  const [reports, setReports] = useState([]);
+  const [inventoryList, setInventoryList] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [apiReportCounts, setApiReportCounts] = useState(null);
   const [toasts, setToasts] = useState([]);
 
@@ -131,10 +125,8 @@ export function App() {
     }, 4500);
   }, []);
 
-  const isMockMode = API_MOCK || Boolean(currentOfficer?.isMock);
-
   const refreshAdminData = useCallback(async () => {
-    if (!currentOfficer || isMockMode) return;
+    if (!currentOfficer) return;
     const tasks = [fetchReports(), fetchInventories()];
     if (isHighPrivilege) {
       tasks.push(fetchAuditLogs());
@@ -151,10 +143,10 @@ export function App() {
     if (isHighPrivilege && auditRes?.status === 'fulfilled') {
       setAuditLogs(auditRes.value);
     }
-  }, [currentOfficer, isMockMode, isHighPrivilege]);
+  }, [currentOfficer, isHighPrivilege]);
 
   useEffect(() => {
-    if (!currentOfficer || isMockMode) return;
+    if (!currentOfficer) return;
     let active = true;
     const loadInitial = async () => {
       try {
@@ -169,7 +161,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [currentOfficer, isMockMode, refreshAdminData, addToast]);
+  }, [currentOfficer, refreshAdminData, addToast]);
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -179,6 +171,10 @@ export function App() {
       setSecureFileModal((prev) => ({ ...prev, isOpen: false }));
       setActiveJsonLog(null);
       setSelectedTicketCode(null);
+      setApiReportCounts(null);
+      setReports([]);
+      setInventoryList([]);
+      setAuditLogs([]);
       setCurrentOfficer(null);
       setLoginNotice('Sesi Anda telah berakhir. Silakan login kembali.');
       if (window.location.pathname !== '/login') {
@@ -193,32 +189,6 @@ export function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const appendAuditLog = (
-    action,
-    targetTable,
-    targetId,
-    payload,
-    actorName = currentOfficer?.name || 'Budi Santoso',
-    actorId = currentOfficer?.id || 'ADM-04D'
-  ) => {
-    const now = new Date();
-    const formattedTimestamp = now.toISOString().replace('T', ' ').slice(0, 19) + ' WIB';
-
-    const newLog = {
-      id: `AUD-${Math.floor(1000 + Math.random() * 9000)}`,
-      timestamp: formattedTimestamp,
-      actorName,
-      actorId,
-      action,
-      targetTable,
-      targetId,
-      payload,
-      ipAddress: '10.24.110.15',
-    };
-
-    setAuditLogs((prev) => [newLog, ...prev]);
-  };
-
   const selectedReport = selectedTicketCode
     ? reports.find((r) => r.ticketCode === selectedTicketCode) || null
     : null;
@@ -227,7 +197,7 @@ export function App() {
     setSelectedTicketCode(report.ticketCode);
     setIsDrawerOpen(true);
 
-    if (!isMockMode && !report.detailLoaded) {
+    if (!report.detailLoaded) {
       try {
         const detail = await fetchReportDetailWithFiles(report.ticketCode);
         setReports((prev) =>
@@ -254,388 +224,132 @@ export function App() {
 
   const handleIssueInvitation = async (reportCode, matchedInventoryId, notes) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
-    if (!isMockMode) {
-      try {
-        await updateReportStatus(reportCode, {
-          status: 'Perlu Verifikasi',
-          matchedInventoryId,
-          adminNotes: notes,
-        });
-        await refreshAdminData();
-        addToast(
-          'success',
-          'Undangan Loket Diterbitkan',
-          `Status tiket ${reportCode} kini 'Perlu Verifikasi'. Email dikirim ke ${target?.reporterEmail || 'pelapor'}.`
-        );
-      } catch (err) {
-        addToast('error', 'Gagal Menerbitkan Undangan', err?.message || 'Gagal memperbarui status.');
-      }
-      return;
+    try {
+      await updateReportStatus(reportCode, {
+        status: 'Perlu Verifikasi',
+        matchedInventoryId,
+        adminNotes: notes,
+      });
+      await refreshAdminData();
+      addToast(
+        'success',
+        'Undangan Loket Diterbitkan',
+        `Status tiket ${reportCode} kini 'Perlu Verifikasi'. Email dikirim ke ${
+          target?.reporterEmail || 'pelapor'
+        }.`
+      );
+    } catch (err) {
+      addToast('error', 'Gagal Menerbitkan Undangan', err?.message || 'Gagal memperbarui status.');
     }
-
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === reportCode
-          ? {
-              ...r,
-              status: 'Perlu Verifikasi',
-              matchedInventoryId: matchedInventoryId || r.matchedInventoryId,
-              adminNotes: notes || r.adminNotes,
-            }
-          : r
-      )
-    );
-
-    appendAuditLog('STATUS_UPDATE', `reports: ${reportCode}`, reportCode, {
-      action: 'ISSUE_VERIFICATION_INVITATION',
-      ticket_code: reportCode,
-      previous_status: target?.status || 'Belum Ada',
-      new_status: 'Perlu Verifikasi',
-      matched_inventory_id: matchedInventoryId,
-      dispatched_to: target?.reporterEmail,
-      loket_desk: 'Loket D Margonda',
-    });
-
-    addToast(
-      'success',
-      'Undangan Loket Diterbitkan',
-      `Status tiket ${reportCode} kini 'Perlu Verifikasi'. Email dikirim ke ${target?.reporterEmail}.`
-    );
   };
 
   const handleRejectReport = async (reportCode, reason) => {
-    const target = reports.find((r) => r.ticketCode === reportCode);
-    if (!isMockMode) {
-      try {
-        await updateReportStatus(reportCode, {
-          status: 'Ditolak',
-          rejectionReason: reason,
-        });
-        await refreshAdminData();
-        addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
-      } catch (err) {
-        addToast('error', 'Gagal Menolak Laporan', err?.message || 'Gagal menolak laporan.');
-      }
-      return;
+    try {
+      await updateReportStatus(reportCode, {
+        status: 'Ditolak',
+        rejectionReason: reason,
+      });
+      await refreshAdminData();
+      addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
+    } catch (err) {
+      addToast('error', 'Gagal Menolak Laporan', err?.message || 'Gagal menolak laporan.');
     }
-
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === reportCode
-          ? {
-              ...r,
-              status: 'Ditolak',
-              adminNotes: `Alasan Ditolak: ${reason}`,
-              publicRejectReason: reason,
-            }
-          : r
-      )
-    );
-
-    appendAuditLog('REPORT_REJECT', `reports: ${reportCode}`, reportCode, {
-      action: 'REJECT_TICKET',
-      ticket_code: reportCode,
-      previous_status: target?.status || 'Belum Ada',
-      new_status: 'Ditolak',
-      reason,
-      officer: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
-    });
-
-    addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
   };
 
   const handleRestoreStaleReport = async (reportCode) => {
-    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
-      currentOfficer?.id || 'ADM-04D'
-    })`;
-    if (!isMockMode) {
-      try {
-        await restoreStaleReport(reportCode);
-        await refreshAdminData();
-        addToast(
-          'success',
-          'Laporan Lawas Dipulihkan',
-          `Tiket ${reportCode} dikembalikan ke antrean aktif.`
-        );
-      } catch (err) {
-        addToast('error', 'Gagal Memulihkan Laporan', err?.message || 'Aksi gagal diproses.');
-      }
-      return;
+    try {
+      await restoreStaleReport(reportCode);
+      await refreshAdminData();
+      addToast(
+        'success',
+        'Laporan Lawas Dipulihkan',
+        `Tiket ${reportCode} dikembalikan ke antrean aktif.`
+      );
+    } catch (err) {
+      addToast('error', 'Gagal Memulihkan Laporan', err?.message || 'Aksi gagal diproses.');
     }
-
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === reportCode
-          ? {
-              ...r,
-              isStale: false,
-              adminNotes: `${
-                r.adminNotes ? r.adminNotes + ' | ' : ''
-              }Dipulihkan dari laporan lawas oleh ${officerLabel}.`,
-            }
-          : r
-      )
-    );
-
-    appendAuditLog('STALE_RESTORE', `reports: ${reportCode}`, reportCode, {
-      action: 'RESTORE_STALE_REPORT',
-      ticket_code: reportCode,
-      previous_is_stale: true,
-      new_is_stale: false,
-      restored_by: officerLabel,
-    });
-
-    addToast(
-      'success',
-      'Laporan Lawas Dipulihkan',
-      `Tiket ${reportCode} dikembalikan ke antrean aktif.`
-    );
   };
 
   const handleRevertToUnmatched = async (reportCode, reason) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
-    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
-      currentOfficer?.id || 'ADM-04D'
-    })`;
-
-    if (!isMockMode) {
-      try {
-        const nextNotes = `${
-          target?.adminNotes ? target.adminNotes + ' | ' : ''
-        }Verifikasi loket gagal (${reason}) — dikembalikan ke Belum Ada.`;
-        await updateReportStatus(reportCode, {
-          status: 'Belum Ada',
-          matchedInventoryId: '',
-          adminNotes: nextNotes,
-        });
-        await refreshAdminData();
-        addToast(
-          'warning',
-          'Dikembalikan ke Belum Ada',
-          `Tiket ${reportCode} dikembalikan ke antrean. Inventori tetap Tersimpan.`
-        );
-      } catch (err) {
-        addToast('error', 'Gagal Mengembalikan Tiket', err?.message || 'Transisi status ditolak.');
-      }
-      return;
+    try {
+      const nextNotes = `${
+        target?.adminNotes ? target.adminNotes + ' | ' : ''
+      }Verifikasi loket gagal (${reason}) — dikembalikan ke Belum Ada.`;
+      await updateReportStatus(reportCode, {
+        status: 'Belum Ada',
+        matchedInventoryId: '',
+        adminNotes: nextNotes,
+      });
+      await refreshAdminData();
+      addToast(
+        'warning',
+        'Dikembalikan ke Belum Ada',
+        `Tiket ${reportCode} dikembalikan ke antrean. Inventori tetap Tersimpan.`
+      );
+    } catch (err) {
+      addToast('error', 'Gagal Mengembalikan Tiket', err?.message || 'Transisi status ditolak.');
     }
-
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === reportCode
-          ? {
-              ...r,
-              status: 'Belum Ada',
-              matchedInventoryId: '',
-              adminNotes: `${
-                r.adminNotes ? r.adminNotes + ' | ' : ''
-              }Verifikasi loket gagal (${reason}) — dikembalikan ke Belum Ada.`,
-            }
-          : r
-      )
-    );
-
-    appendAuditLog('STATUS_REVERT', `reports: ${reportCode}`, reportCode, {
-      action: 'REVERT_VERIFICATION_FAILED',
-      ticket_code: reportCode,
-      previous_status: target?.status || 'Perlu Verifikasi',
-      new_status: 'Belum Ada',
-      reason,
-      inventory_retained_status: 'Tersimpan',
-      officer: officerLabel,
-    });
-
-    addToast(
-      'warning',
-      'Dikembalikan ke Belum Ada',
-      `Tiket ${reportCode} dikembalikan ke antrean. Inventori tetap Tersimpan.`
-    );
   };
 
   const handleReopenRejectedReport = async (reportCode, { reason }) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
-    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
-      currentOfficer?.id || 'ADM-04D'
-    })`;
-    const resubmitToken = `RST-${reportCode.replace(/[^A-Z0-9]/gi, '')}-${Date.now()
-      .toString(36)
-      .toUpperCase()}`;
-    const resubmitLink = `/lapor?reopen=${resubmitToken}`;
-
-    if (!isMockMode) {
-      try {
-        await updateReportStatus(reportCode, {
-          status: 'Dibatalkan',
-          adminNotes: `${
-            target?.adminNotes ? target.adminNotes + ' | ' : ''
-          }Status Ditolak dibatalkan menjadi Dibatalkan (${reason}).`,
-        });
-        await refreshAdminData();
-        addToast(
-          'success',
-          'Status Ditolak → Dibatalkan',
-          `Tiket ${reportCode} diubah menjadi Dibatalkan.`
-        );
-      } catch (err) {
-        addToast(
-          'error',
-          'Belum Didukung Backend',
-          err?.message || 'Backend saat ini belum membuka transisi Ditolak → Dibatalkan.'
-        );
-      }
-      return;
-    }
-
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === reportCode
-          ? {
-              ...r,
-              status: 'Dibatalkan',
-              cancelledFrom: 'Ditolak',
-              cancelReason: reason,
-              cancelledBy: officerLabel,
-              cancelEmailType: 'RESUBMIT_INVITATION',
-              resubmitLink,
-              adminNotes: `${
-                r.adminNotes ? r.adminNotes + ' | ' : ''
-              }Status Ditolak dibatalkan menjadi Dibatalkan oleh ${officerLabel} (${reason}). Email tombol Ajukan Ulang dikirim ke ${r.reporterEmail}.`,
-            }
-          : r
-      )
-    );
-
-    appendAuditLog('STATUS_REVERT', `reports: ${reportCode}`, reportCode, {
-      action: 'CANCEL_REJECTED_REPORT',
-      ticket_code: reportCode,
-      previous_status: target?.status || 'Ditolak',
-      new_status: 'Dibatalkan',
-      reason,
-      email_type: 'RESUBMIT_INVITATION',
-      resubmit_link: resubmitLink,
-      officer: officerLabel,
-    });
-
-    addToast(
-      'success',
-      'Status Ditolak → Dibatalkan',
-      `Tiket ${reportCode} diubah menjadi Dibatalkan. Email khusus berisi tombol Ajukan Ulang telah dikirim ke ${target?.reporterEmail}.`
-    );
-  };
-
-  const handleVoidHandover = async (
-    reportCode,
-    { reason, restoreInventory, includeResubmitLink }
-  ) => {
-    const target = reports.find((r) => r.ticketCode === reportCode);
-    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
-      currentOfficer?.id || 'ADM-04D'
-    })`;
-    const matchedInvId = target?.matchedInventoryId || '';
-    const resubmitLink = includeResubmitLink
-      ? `/lapor?reopen=VOID-${reportCode.replace(/[^A-Z0-9]/gi, '')}-${Date.now()
-          .toString(36)
-          .toUpperCase()}`
-      : null;
-
-    if (!isMockMode) {
-      try {
-        await updateReportStatus(reportCode, {
-          status: 'Dibatalkan',
-          adminNotes: `${
-            target?.adminNotes ? target.adminNotes + ' | ' : ''
-          }Status Selesai dibatalkan menjadi Dibatalkan (${reason}).`,
-        });
-        await refreshAdminData();
-        addToast(
-          'warning',
-          'Status Selesai → Dibatalkan',
-          `Tiket ${reportCode} diubah menjadi Dibatalkan.`
-        );
-      } catch (err) {
-        addToast(
-          'error',
-          'Belum Didukung Backend',
-          err?.message || 'Backend saat ini belum membuka void/revert untuk status Selesai.'
-        );
-      }
-      return;
-    }
-
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === reportCode
-          ? {
-              ...r,
-              status: 'Dibatalkan',
-              cancelledFrom: 'Selesai',
-              cancelReason: reason,
-              cancelledBy: officerLabel,
-              cancelEmailType: 'ERROR_CLARIFICATION',
-              resubmitLink,
-              matchedInventoryId: '',
-              adminNotes: `${
-                r.adminNotes ? r.adminNotes + ' | ' : ''
-              }Status Selesai dibatalkan menjadi Dibatalkan oleh ${officerLabel} (${reason}). Email pemberitahuan kesalahan dikirim ke ${r.reporterEmail}.`,
-            }
-          : r
-      )
-    );
-
-    if (restoreInventory && matchedInvId) {
-      setInventoryList((prev) =>
-        prev.map((inv) =>
-          inv.id === matchedInvId
-            ? {
-                ...inv,
-                status: 'Tersimpan',
-                notes: `${inv.notes} [SERAH TERIMA DIBATALKAN: ${reason}]`,
-              }
-            : inv
-        )
+    try {
+      await updateReportStatus(reportCode, {
+        status: 'Dibatalkan',
+        adminNotes: `${
+          target?.adminNotes ? target.adminNotes + ' | ' : ''
+        }Status Ditolak dibatalkan menjadi Dibatalkan (${reason}).`,
+      });
+      await refreshAdminData();
+      addToast(
+        'success',
+        'Status Ditolak → Dibatalkan',
+        `Tiket ${reportCode} diubah menjadi Dibatalkan.`
+      );
+    } catch (err) {
+      addToast(
+        'error',
+        'Belum Didukung Backend',
+        err?.message || 'Backend saat ini belum membuka transisi Ditolak → Dibatalkan.'
       );
     }
+  };
 
-    appendAuditLog('HANDOVER_VOID', `reports: ${reportCode}`, reportCode, {
-      action: 'CANCEL_COMPLETED_REPORT',
-      ticket_code: reportCode,
-      previous_status: target?.status || 'Selesai',
-      new_status: 'Dibatalkan',
-      reason,
-      matched_inventory_id: matchedInvId || 'N/A',
-      inventory_restored_to_tersimpan: Boolean(restoreInventory && matchedInvId),
-      email_type: 'ERROR_CLARIFICATION',
-      resubmit_link: resubmitLink,
-      officer: officerLabel,
-    });
-
-    addToast(
-      'warning',
-      'Status Selesai → Dibatalkan',
-      `Tiket ${reportCode} diubah menjadi Dibatalkan${
-        restoreInventory && matchedInvId ? ' & inventori kembali Tersimpan' : ''
-      }. Email pemberitahuan kesalahan telah dikirim ke ${target?.reporterEmail}.`
-    );
+  const handleVoidHandover = async (reportCode, { reason }) => {
+    const target = reports.find((r) => r.ticketCode === reportCode);
+    try {
+      await updateReportStatus(reportCode, {
+        status: 'Dibatalkan',
+        adminNotes: `${
+          target?.adminNotes ? target.adminNotes + ' | ' : ''
+        }Status Selesai dibatalkan menjadi Dibatalkan (${reason}).`,
+      });
+      await refreshAdminData();
+      addToast(
+        'warning',
+        'Status Selesai → Dibatalkan',
+        `Tiket ${reportCode} diubah menjadi Dibatalkan.`
+      );
+    } catch (err) {
+      addToast(
+        'error',
+        'Belum Didukung Backend',
+        err?.message || 'Backend saat ini belum membuka void/revert untuk status Selesai.'
+      );
+    }
   };
 
   const handleSaveNotes = async (reportCode, notes) => {
-    if (!isMockMode) {
-      try {
-        await updateReportNotes(reportCode, { adminNotes: notes });
-        setReports((prev) =>
-          prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
-        );
-        addToast('info', 'Catatan Disimpan', `Catatan internal tiket ${reportCode} diperbarui.`);
-      } catch (err) {
-        addToast('error', 'Gagal Menyimpan Catatan', err?.message || 'Gagal menyimpan catatan.');
-      }
-      return;
+    try {
+      await updateReportNotes(reportCode, { adminNotes: notes });
+      setReports((prev) =>
+        prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
+      );
+      addToast('info', 'Catatan Disimpan', `Catatan internal tiket ${reportCode} diperbarui.`);
+    } catch (err) {
+      addToast('error', 'Gagal Menyimpan Catatan', err?.message || 'Gagal menyimpan catatan.');
     }
-
-    setReports((prev) =>
-      prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
-    );
-    addToast('info', 'Catatan Disimpan', `Catatan internal tiket ${reportCode} diperbarui.`);
   };
 
   const handleCompleteHandover = async (params) => {
@@ -649,76 +363,19 @@ export function App() {
       return false;
     }
 
-    if (!isMockMode) {
-      try {
-        await createHandover(params);
-        await refreshAdminData();
-        addToast(
-          'success',
-          'Serah Terima Sukses',
-          `Tiket ${params.ticketCode} resmi 'Selesai' & inventori diubah menjadi 'Diambil'.`
-        );
-        return true;
-      } catch (err) {
-        addToast('error', 'Serah Terima Gagal', err?.message || 'Gagal memproses serah terima.');
-        return false;
-      }
-    }
-
-    const matchedInvId = params.inventoryId || target.matchedInventoryId;
-    setReports((prev) =>
-      prev.map((r) =>
-        r.ticketCode === params.ticketCode
-          ? {
-              ...r,
-              status: 'Selesai',
-              matchedInventoryId: matchedInvId || r.matchedInventoryId,
-              adminNotes: `${
-                r.adminNotes ? r.adminNotes + ' | ' : ''
-              }Serah terima selesai kepada ${params.recipientName} (${
-                params.recipientNpm
-              }). Catatan: ${params.notes}`,
-            }
-          : r
-      )
-    );
-
-    if (matchedInvId) {
-      setInventoryList((prev) =>
-        prev.map((inv) =>
-          inv.id === matchedInvId
-            ? {
-                ...inv,
-                status: 'Diambil',
-                notes: `${inv.notes} [DIAMBIL pada ${new Date().toLocaleDateString('id-ID')} oleh ${
-                  params.recipientName
-                }]`,
-              }
-            : inv
-        )
+    try {
+      await createHandover(params);
+      await refreshAdminData();
+      addToast(
+        'success',
+        'Serah Terima Sukses',
+        `Tiket ${params.ticketCode} resmi 'Selesai' & inventori diubah menjadi 'Diambil'.`
       );
+      return true;
+    } catch (err) {
+      addToast('error', 'Serah Terima Gagal', err?.message || 'Gagal memproses serah terima.');
+      return false;
     }
-
-    appendAuditLog('HANDOVER_EXECUTE', `reports: ${params.ticketCode}`, params.ticketCode, {
-      action: 'PHYSICAL_HANDOVER',
-      ticket_code: params.ticketCode,
-      recipient_name: params.recipientName,
-      recipient_npm: params.recipientNpm,
-      matched_inventory_id: matchedInvId || 'N/A',
-      officer_notes: params.notes,
-      ktm_verified_physically: true,
-      secret_feature_proven: true,
-      photo_evidence_uploaded: true,
-      officer: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
-      desk: 'Loket D Margonda',
-    });
-
-    addToast(
-      'success',
-      'Serah Terima Sukses',
-      `Tiket ${params.ticketCode} resmi 'Selesai' & inventori diubah menjadi 'Diambil'.`
-    );
-    return true;
   };
 
   const handleGoToHandoverFromDrawer = (ticketCode) => {
@@ -743,153 +400,45 @@ export function App() {
   };
 
   const handleCreateInventory = async (newItem) => {
-    if (!isMockMode) {
-      try {
-        const created = await createInventory(newItem);
-        await refreshAdminData();
-        addToast(
-          'success',
-          'Inventori Ditambahkan',
-          `[${created.id}] ${created.title} tersimpan di ${created.storageLocker}.`
-        );
-      } catch (err) {
-        addToast('error', 'Gagal Menambah Inventori', err?.message || 'Gagal menyimpan inventori.');
-      }
-      return;
+    try {
+      const created = await createInventory(newItem);
+      await refreshAdminData();
+      addToast(
+        'success',
+        'Inventori Ditambahkan',
+        `[${created.id}] ${created.title} tersimpan di ${created.storageLocker}.`
+      );
+    } catch (err) {
+      addToast('error', 'Gagal Menambah Inventori', err?.message || 'Gagal menyimpan inventori.');
     }
-
-    setInventoryList((prev) => [newItem, ...prev]);
-
-    appendAuditLog('INV_CREATE', `inventories: ${newItem.id}`, newItem.id, {
-      action: 'REGISTER_FOUND_ITEM',
-      inventory_id: newItem.id,
-      item_title: newItem.title,
-      category: newItem.category,
-      storage_location: newItem.storageLocker,
-      found_location: newItem.foundLocation,
-      found_date: newItem.foundDate,
-      finder: newItem.finderName,
-      finder_contact: newItem.finderContact || null,
-      registered_by: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
-    });
-
-    addToast(
-      'success',
-      'Inventori Ditambahkan',
-      `[${newItem.id}] ${newItem.title} tersimpan di ${newItem.storageLocker}.`
-    );
   };
 
   const handleUpdateInventory = async (updatedItem) => {
-    if (!isMockMode) {
-      try {
-        await updateInventory(updatedItem.id, updatedItem);
-        await refreshAdminData();
-        addToast(
-          'info',
-          'Inventori Diperbarui',
-          `Detail barang [${updatedItem.id}] berhasil disimpan.`
-        );
-      } catch (err) {
-        addToast('error', 'Gagal Memperbarui Inventori', err?.message || 'Gagal menyimpan perubahan.');
-      }
-      return;
+    try {
+      await updateInventory(updatedItem.id, updatedItem);
+      await refreshAdminData();
+      addToast(
+        'info',
+        'Inventori Diperbarui',
+        `Detail barang [${updatedItem.id}] berhasil disimpan.`
+      );
+    } catch (err) {
+      addToast('error', 'Gagal Memperbarui Inventori', err?.message || 'Gagal menyimpan perubahan.');
     }
-
-    setInventoryList((prev) =>
-      prev.map((inv) =>
-        inv.id === updatedItem.id && inv.status === 'Tersimpan' ? updatedItem : inv
-      )
-    );
-
-    appendAuditLog('INV_UPDATE', `inventories: ${updatedItem.id}`, updatedItem.id, {
-      action: 'UPDATE_FOUND_ITEM',
-      inventory_id: updatedItem.id,
-      item_title: updatedItem.title,
-      category: updatedItem.category,
-      storage_location: updatedItem.storageLocker,
-      found_location: updatedItem.foundLocation,
-      found_date: updatedItem.foundDate,
-      finder: updatedItem.finderName,
-      finder_contact: updatedItem.finderContact || null,
-      updated_by: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
-    });
-
-    addToast(
-      'info',
-      'Inventori Diperbarui',
-      `Detail barang [${updatedItem.id}] berhasil disimpan.`
-    );
   };
 
   const handleDeleteInventory = async (inventoryId, reason) => {
-    if (!isMockMode) {
-      try {
-        await deleteInventory(inventoryId, { reason, confirmId: inventoryId });
-        await refreshAdminData();
-        addToast('warning', 'Inventori Dihapus', `Barang [${inventoryId}] berhasil dihapus.`);
-      } catch (err) {
-        addToast(
-          'error',
-          'Hapus Inventori Belum Didukung Backend',
-          err?.message || 'Endpoint DELETE /api/v1/admin/inventories/:id belum tersedia di backend.'
-        );
-      }
-      return;
-    }
-
-    const targetItem = inventoryList.find((inv) => inv.id === inventoryId);
-    const linkedReport = reports.find((r) => r.matchedInventoryId === inventoryId);
-    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
-      currentOfficer?.id || 'ADM-04D'
-    })`;
-
-    setInventoryList((prev) => prev.filter((inv) => inv.id !== inventoryId));
-
-    if (linkedReport) {
-      setReports((prev) =>
-        prev.map((r) =>
-          r.matchedInventoryId === inventoryId
-            ? {
-                ...r,
-                matchedInventoryId: '',
-                status: r.status === 'Perlu Verifikasi' ? 'Belum Ada' : r.status,
-                adminNotes: `${
-                  r.adminNotes ? r.adminNotes + ' | ' : ''
-                }Inventori tertaut [${inventoryId}] dihapus oleh ${officerLabel} (${reason})${
-                  r.status === 'Perlu Verifikasi' ? ' — status dikembalikan ke Belum Ada.' : '.'
-                }`,
-              }
-            : r
-        )
+    try {
+      await deleteInventory(inventoryId, { reason, confirmId: inventoryId });
+      await refreshAdminData();
+      addToast('warning', 'Inventori Dihapus', `Barang [${inventoryId}] berhasil dihapus.`);
+    } catch (err) {
+      addToast(
+        'error',
+        'Hapus Inventori Belum Didukung Backend',
+        err?.message || 'Endpoint DELETE /api/v1/admin/inventories/:id belum tersedia di backend.'
       );
     }
-
-    appendAuditLog('INV_DELETE', `inventories: ${inventoryId}`, inventoryId, {
-      action: 'DELETE_FOUND_ITEM',
-      inventory_id: inventoryId,
-      item_title: targetItem?.title || 'N/A',
-      storage_location: targetItem?.storageLocker || 'N/A',
-      reason,
-      unlinked_ticket: linkedReport?.ticketCode || null,
-      reverted_ticket_to_belum_ada:
-        linkedReport?.status === 'Perlu Verifikasi' ? linkedReport.ticketCode : null,
-      deleted_by: officerLabel,
-    });
-
-    addToast(
-      'warning',
-      'Inventori Dihapus',
-      `Barang [${inventoryId}] berhasil dihapus dari inventori.${
-        linkedReport
-          ? ` Tautan tiket ${linkedReport.ticketCode} dilepas${
-              linkedReport.status === 'Perlu Verifikasi'
-                ? ' & dikembalikan ke Belum Ada'
-                : ''
-            }.`
-          : ''
-      }`
-    );
   };
 
   const handleLoginSuccess = (officer) => {
@@ -910,9 +459,9 @@ export function App() {
     setActiveJsonLog(null);
     setSelectedTicketCode(null);
     setApiReportCounts(null);
-    setReports(INITIAL_REPORTS);
-    setInventoryList(INITIAL_INVENTORY);
-    setAuditLogs(INITIAL_AUDIT_LOGS);
+    setReports([]);
+    setInventoryList([]);
+    setAuditLogs([]);
     setCurrentOfficer(null);
     setLoginNotice('Sesi petugas telah diakhiri. Silakan masuk kembali untuk mengakses panel.');
     if (window.location.pathname !== '/login') {
@@ -929,24 +478,23 @@ export function App() {
     );
   }
 
-  const statsCounts =
-    !isMockMode && apiReportCounts
-      ? {
-          belumAda: apiReportCounts.belum_ada ?? 0,
-          perluVerifikasi: apiReportCounts.perlu_verifikasi ?? 0,
-          lawas: apiReportCounts.lawas ?? 0,
-          selesai: apiReportCounts.selesai ?? 0,
-          ditolak: apiReportCounts.ditolak ?? 0,
-          dibatalkan: apiReportCounts.dibatalkan ?? 0,
-        }
-      : {
-          belumAda: reports.filter((r) => r.status === 'Belum Ada').length,
-          perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
-          lawas: reports.filter((r) => r.isStale).length,
-          selesai: reports.filter((r) => r.status === 'Selesai').length,
-          ditolak: reports.filter((r) => r.status === 'Ditolak').length,
-          dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
-        };
+  const statsCounts = apiReportCounts
+    ? {
+        belumAda: apiReportCounts.belum_ada ?? 0,
+        perluVerifikasi: apiReportCounts.perlu_verifikasi ?? 0,
+        lawas: apiReportCounts.lawas ?? 0,
+        selesai: apiReportCounts.selesai ?? 0,
+        ditolak: apiReportCounts.ditolak ?? 0,
+        dibatalkan: apiReportCounts.dibatalkan ?? 0,
+      }
+    : {
+        belumAda: reports.filter((r) => r.status === 'Belum Ada').length,
+        perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
+        lawas: reports.filter((r) => r.isStale).length,
+        selesai: reports.filter((r) => r.status === 'Selesai').length,
+        ditolak: reports.filter((r) => r.status === 'Ditolak').length,
+        dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
+      };
 
   return (
     <div className="min-h-svh bg-paper text-ink flex flex-col font-sans">
