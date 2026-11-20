@@ -21,10 +21,17 @@ export const AdminStatsCards = ({ counts }) => {
       subtitle: 'Serah terima selesai',
       valueColor: 'text-ok',
     },
+    {
+      key: 'Dibatalkan',
+      title: 'Dibatalkan',
+      value: counts.dibatalkan ?? 0,
+      subtitle: 'Hasil revert selesai/ditolak',
+      valueColor: 'text-ink-2',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_2fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_2.5fr]">
       {/* Left Zone: Primary Actionable Queue Overview */}
       <div className="rounded-[5px] border-[1.5px] border-ug-200 bg-ug-100/60 p-5 flex flex-col justify-between">
         <span className="text-xs font-bold uppercase tracking-[0.08em] text-ug-700">
@@ -41,8 +48,8 @@ export const AdminStatsCards = ({ counts }) => {
         </div>
       </div>
 
-      {/* Right Zone: Unified 3-Column Counter Ledger */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 rounded-[5px] border-[1.5px] border-line-strong bg-sheet divide-y sm:divide-y-0 sm:divide-x divide-line overflow-hidden">
+      {/* Right Zone: Unified 4-Column Counter Ledger */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-[5px] border-[1.5px] border-line-strong bg-sheet divide-y sm:divide-y-0 sm:divide-x divide-line overflow-hidden">
         {ledgerCells.map((cell) => (
           <div key={cell.key} className="p-4 sm:p-5 flex flex-col justify-between bg-sheet">
             <span className="text-xs font-bold text-ink">{cell.title}</span>

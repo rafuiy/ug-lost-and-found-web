@@ -12,6 +12,7 @@ import {
   LuPrinter,
   LuArrowLeft,
   LuImage,
+  LuChevronDown,
 } from 'react-icons/lu';
 
 function findReportByCode(reports, rawCode) {
@@ -20,11 +21,28 @@ function findReportByCode(reports, rawCode) {
   return reports.find((r) => r.ticketCode.toUpperCase() === code) || null;
 }
 
-function getInitialHandoverState(reports, initialTicketCode) {
+function validateHandoverReport(found, code) {
+  if (!found) {
+    return `Tiket ${code} tidak ditemukan dalam database loket.`;
+  }
+  if (found.status === 'Selesai') {
+    return `Tiket ${code} sudah selesai diserahterimakan. Handover ganda tidak diperbolehkan.`;
+  }
+  if (found.status === 'Ditolak') {
+    return `Tiket ${code} berstatus "Ditolak" dan tidak dapat diproses serah terima.`;
+  }
+  if (found.status !== 'Perlu Verifikasi') {
+    return `Tiket ${code} masih berstatus "${found.status}". Terbitkan undangan verifikasi terlebih dahulu sebelum serah terima.`;
+  }
+  return '';
+}
+
+function getInitialHandoverState(reports, inventoryList, initialTicketCode) {
   if (!initialTicketCode) {
     return {
       ticketInput: '',
       loadedReport: null,
+      selectedInventoryId: '',
       errorMsg: '',
       recipientName: '',
       recipientNpm: '',
@@ -32,18 +50,27 @@ function getInitialHandoverState(reports, initialTicketCode) {
   }
   const normalized = initialTicketCode.trim().toUpperCase();
   const found = findReportByCode(reports, normalized);
-  if (!found) {
+  const validationError = validateHandoverReport(found, normalized);
+  if (validationError) {
     return {
       ticketInput: normalized,
       loadedReport: null,
-      errorMsg: `Tiket ${normalized} tidak ditemukan dalam database loket.`,
+      selectedInventoryId: '',
+      errorMsg: validationError,
       recipientName: '',
       recipientNpm: '',
     };
   }
+  const prematched = found.matchedInventoryId
+    ? inventoryList.find(
+        (inv) => inv.id === found.matchedInventoryId && inv.status === 'Tersimpan'
+      )
+    : null;
+
   return {
     ticketInput: normalized,
     loadedReport: found,
+    selectedInventoryId: prematched?.id || '',
     errorMsg: '',
     recipientName: found.reporterName,
     recipientNpm: found.reporterNpm,
@@ -58,11 +85,14 @@ export const AdminHandoverPage = ({
   onBackToQueue,
 }) => {
   const [initialState] = useState(() =>
-    getInitialHandoverState(reports, initialTicketCode)
+    getInitialHandoverState(reports, inventoryList, initialTicketCode)
   );
 
   const [ticketInput, setTicketInput] = useState(initialState.ticketInput);
   const [loadedReport, setLoadedReport] = useState(initialState.loadedReport);
+  const [selectedInventoryId, setSelectedInventoryId] = useState(
+    initialState.selectedInventoryId
+  );
   const [errorMsg, setErrorMsg] = useState(initialState.errorMsg);
 
   const [ktmChecked, setKtmChecked] = useState(false);
@@ -77,31 +107,42 @@ export const AdminHandoverPage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
 
+  const availableInventory = inventoryList.filter((inv) => inv.status === 'Tersimpan');
+  const eligibleReports = reports.filter((r) => r.status === 'Perlu Verifikasi');
+
   const handleLoadData = (codeToSearch) => {
     const code = (codeToSearch || ticketInput).trim().toUpperCase();
     if (!code) {
       setErrorMsg('Masukkan kode tiket pengaduan terlebih dahulu.');
+      setLoadedReport(null);
+      setSelectedInventoryId('');
       return;
     }
 
     const found = findReportByCode(reports, code);
-    if (!found) {
-      setErrorMsg(`Tiket ${code} tidak ditemukan dalam database loket.`);
+    const validationError = validateHandoverReport(found, code);
+    if (validationError) {
+      setErrorMsg(validationError);
       setLoadedReport(null);
+      setSelectedInventoryId('');
       return;
     }
 
+    const prematched = found.matchedInventoryId
+      ? availableInventory.find((inv) => inv.id === found.matchedInventoryId)
+      : null;
+
     setErrorMsg('');
     setLoadedReport(found);
+    setSelectedInventoryId(prematched?.id || '');
     setRecipientName(found.reporterName);
     setRecipientNpm(found.reporterNpm);
     setKtmChecked(false);
     setSecretChecked(false);
   };
 
-  const matchedInventory = loadedReport?.matchedInventoryId
-    ? inventoryList.find((inv) => inv.id === loadedReport.matchedInventoryId)
-    : null;
+  const selectedInventory =
+    availableInventory.find((inv) => inv.id === selectedInventoryId) || null;
 
   const handleSimulatePhotoUpload = () => {
     setPhotoEvidence(
@@ -122,6 +163,8 @@ export const AdminHandoverPage = ({
 
   const isFormValid =
     loadedReport !== null &&
+    loadedReport.status === 'Perlu Verifikasi' &&
+    selectedInventory !== null &&
     ktmChecked &&
     secretChecked &&
     recipientName.trim().length > 0 &&
@@ -130,12 +173,13 @@ export const AdminHandoverPage = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!isFormValid || !loadedReport) return;
+    if (!isFormValid || !loadedReport || !selectedInventory) return;
 
     setIsSubmitting(true);
     setTimeout(() => {
       onCompleteHandover({
         ticketCode: loadedReport.ticketCode,
+        inventoryId: selectedInventory.id,
         recipientName,
         recipientNpm,
         notes: handoverNotes,
@@ -144,6 +188,7 @@ export const AdminHandoverPage = ({
 
       setReceiptData({
         ticket: loadedReport.ticketCode,
+        inventoryLabel: `[${selectedInventory.id}] ${selectedInventory.title}`,
         recipient: recipientName,
         npm: recipientNpm,
         item: loadedReport.itemName,
@@ -158,6 +203,7 @@ export const AdminHandoverPage = ({
 
   const resetForm = () => {
     setLoadedReport(null);
+    setSelectedInventoryId('');
     setTicketInput('');
     setErrorMsg('');
     setKtmChecked(false);
@@ -223,6 +269,9 @@ export const AdminHandoverPage = ({
                   <span className="font-semibold text-ink-3 uppercase">Barang</span>
                   <span className="font-bold text-ink">{receiptData.item}</span>
 
+                  <span className="font-semibold text-ink-3 uppercase">Inventori</span>
+                  <span className="font-bold text-ug-800">{receiptData.inventoryLabel}</span>
+
                   <span className="font-semibold text-ink-3 uppercase">Penerima</span>
                   <span className="font-bold text-ink">{receiptData.recipient}</span>
 
@@ -273,7 +322,7 @@ export const AdminHandoverPage = ({
                     type="text"
                     value={ticketInput}
                     onChange={(e) => setTicketInput(e.target.value.toUpperCase())}
-                    placeholder="Contoh: UG-7X9K2 atau UG-3M8P1"
+                    placeholder="Contoh: UG-3M8P1"
                     className={`${INPUT_CLASS} h-11 flex-1 font-bold uppercase tabular-nums`}
                   />
                   <Button
@@ -287,29 +336,29 @@ export const AdminHandoverPage = ({
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-ink-3">
-                  <span>Pilihan Cepat:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTicketInput('UG-7X9K2');
-                      handleLoadData('UG-7X9K2');
-                    }}
-                    className="font-bold text-ug-700 underline decoration-2 underline-offset-4 hover:text-ug-900 tabular-nums cursor-pointer"
-                  >
-                    UG-7X9K2
-                  </button>
-                  <span aria-hidden="true">·</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTicketInput('UG-3M8P1');
-                      handleLoadData('UG-3M8P1');
-                    }}
-                    className="font-bold text-ug-700 underline decoration-2 underline-offset-4 hover:text-ug-900 tabular-nums cursor-pointer"
-                  >
-                    UG-3M8P1
-                  </button>
+                <div className="flex items-center gap-2 flex-wrap text-xs text-ink-3">
+                  <span>Tiket Siap Serah Terima (Perlu Verifikasi):</span>
+                  {eligibleReports.length === 0 ? (
+                    <span className="font-medium text-ink-3">
+                      Belum ada tiket berstatus Perlu Verifikasi.
+                    </span>
+                  ) : (
+                    eligibleReports.map((item, idx) => (
+                      <span key={item.ticketCode} className="inline-flex items-center gap-2">
+                        {idx > 0 && <span aria-hidden="true">·</span>}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTicketInput(item.ticketCode);
+                            handleLoadData(item.ticketCode);
+                          }}
+                          className="font-bold text-ug-700 underline decoration-2 underline-offset-4 hover:text-ug-900 tabular-nums cursor-pointer"
+                        >
+                          {item.ticketCode}
+                        </button>
+                      </span>
+                    ))
+                  )}
                 </div>
 
                 {errorMsg && (
@@ -366,17 +415,44 @@ export const AdminHandoverPage = ({
                       </p>
                     </div>
 
-                    {matchedInventory && (
-                      <div className="text-xs text-ink bg-sheet p-2.5 rounded-[4px] border border-line-strong flex items-center justify-between gap-2">
-                        <span>
-                          Inventori: <strong>[{matchedInventory.id}]</strong>{' '}
-                          {matchedInventory.title}
-                        </span>
-                        <span className="font-bold text-ug-800 tabular-nums shrink-0">
-                          {matchedInventory.storageLocker}
-                        </span>
+                    <div className="pt-1">
+                      <label htmlFor="handover-inventory-select" className={LABEL_CLASS}>
+                        Inventori Fisik yang Diserahkan (Status Tersimpan){' '}
+                        <span className="text-danger">*</span>
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="handover-inventory-select"
+                          value={selectedInventoryId}
+                          onChange={(e) => setSelectedInventoryId(e.target.value)}
+                          className={`${INPUT_CLASS} h-10 appearance-none pr-9 font-semibold tabular-nums cursor-pointer`}
+                          required
+                        >
+                          <option value="">-- Pilih Barang Inventori --</option>
+                          {availableInventory.map((inv) => (
+                            <option key={inv.id} value={inv.id}>
+                              [{inv.id}] {inv.title} — {inv.storageLocker}
+                            </option>
+                          ))}
+                        </select>
+                        <LuChevronDown
+                          className="size-4 text-ink-3 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                          aria-hidden="true"
+                        />
                       </div>
-                    )}
+
+                      {selectedInventory && (
+                        <div className="mt-2 text-xs text-ink bg-sheet p-2.5 rounded-[4px] border border-line-strong flex items-center justify-between gap-2">
+                          <span>
+                            Dipilih: <strong>[{selectedInventory.id}]</strong>{' '}
+                            {selectedInventory.title}
+                          </span>
+                          <span className="font-bold text-ug-800 tabular-nums shrink-0">
+                            {selectedInventory.storageLocker}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

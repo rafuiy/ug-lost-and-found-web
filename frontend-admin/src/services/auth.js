@@ -80,3 +80,7 @@ export async function authenticateOfficer({ username, password }) {
 
   return session;
 }
+
+export function isHighPrivilegeOfficer(officer) {
+  return officer?.role === 'Admin Berotorisasi Tinggi';
+}

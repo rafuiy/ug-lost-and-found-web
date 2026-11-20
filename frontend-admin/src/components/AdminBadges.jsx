@@ -1,16 +1,26 @@
 import { LuClock } from 'react-icons/lu';
-import { StatusStamp } from './ui/Stamp';
 
-const VALID_REPORT_STATUSES = new Set([
-  'Belum Ada',
-  'Perlu Verifikasi',
-  'Selesai',
-  'Ditolak',
-]);
+const STATUS_STYLES = {
+  'Belum Ada': 'bg-paper border-line-strong text-ink-2',
+  'Perlu Verifikasi': 'bg-ug-100 border-ug-200 text-ug-800',
+  Selesai: 'bg-ok-wash border-ok/30 text-ok',
+  Ditolak: 'bg-danger-wash border-danger/30 text-danger',
+  Dibatalkan: 'bg-paper border-ink-3/40 text-ink-2',
+  Tersimpan: 'bg-gold-wash border-gold-ink/35 text-gold-ink',
+  Diambil: 'bg-ok-wash border-ok/30 text-ok',
+};
 
-export const StatusBadge = ({ status }) => {
-  if (!VALID_REPORT_STATUSES.has(status)) return null;
-  return <StatusStamp status={status} size="sm" className="bg-sheet/80" />;
+export const StatusBadge = ({ status, className = '' }) => {
+  const toneClass = STATUS_STYLES[status];
+  if (!toneClass) return null;
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-[4px] border px-2.5 py-1 text-xs font-semibold leading-none tracking-[0.01em] whitespace-nowrap ${toneClass} ${className}`}
+    >
+      {status}
+    </span>
+  );
 };
 
 export const StaleBadge = ({ label = 'Lawas >30h' }) => {
@@ -32,6 +42,12 @@ const AUDIT_COLORS = {
   REPORT_REJECT: 'text-danger',
   STALE_FLAGGED: 'text-gold-ink',
   INV_MATCH: 'text-ink',
+  INV_CREATE: 'text-ug-700',
+  INV_UPDATE: 'text-ug-800',
+  STALE_RESTORE: 'text-ug-700',
+  STATUS_REVERT: 'text-gold-ink',
+  HANDOVER_VOID: 'text-danger',
+  INV_DELETE: 'text-danger',
 };
 
 export const AuditBadge = ({ action }) => {

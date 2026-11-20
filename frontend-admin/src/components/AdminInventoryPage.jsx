@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { StatusStamp } from './ui/Stamp';
+import { StatusBadge } from './AdminBadges';
+import { AdminInventoryDrawer } from './AdminInventoryDrawer';
 import { Button } from './ui/Button';
 import { INPUT_CLASS } from './ui/styles';
 import {
@@ -7,12 +8,51 @@ import {
   LuMapPin,
   LuCalendar,
   LuUser,
+  LuPhone,
   LuArrowRight,
+  LuPlus,
+  LuPencil,
+  LuArchive,
 } from 'react-icons/lu';
 
-export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
+export const AdminInventoryPage = ({
+  inventoryList,
+  reports = [],
+  onSelectToMatch,
+  onCreateInventory,
+  onUpdateInventory,
+  onDeleteInventory,
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [drawerState, setDrawerState] = useState({
+    isOpen: false,
+    mode: 'create',
+    item: null,
+  });
+
+  const storedCount = useMemo(
+    () => inventoryList.filter((i) => i.status === 'Tersimpan').length,
+    [inventoryList]
+  );
+
+  const nextInventoryId = useMemo(() => {
+    const maxNum = inventoryList.reduce((max, item) => {
+      const match = /^INV-(\d+)$/i.exec(item.id);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+    return `INV-${String(maxNum + 1).padStart(3, '0')}`;
+  }, [inventoryList]);
+
+  const linkedReportByInvId = useMemo(() => {
+    const map = {};
+    for (const report of reports) {
+      if (report.matchedInventoryId) {
+        map[report.matchedInventoryId] = report.ticketCode;
+      }
+    }
+    return map;
+  }, [reports]);
 
   const filteredInventory = useMemo(() => {
     return inventoryList.filter((item) => {
@@ -22,6 +62,7 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
         return (
           item.id.toLowerCase().includes(query) ||
           item.title.toLowerCase().includes(query) ||
+          item.category.toLowerCase().includes(query) ||
           item.foundLocation.toLowerCase().includes(query) ||
           item.finderName.toLowerCase().includes(query) ||
           item.storageLocker.toLowerCase().includes(query)
@@ -30,6 +71,27 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
       return true;
     });
   }, [inventoryList, statusFilter, searchQuery]);
+
+  const handleOpenCreate = () => {
+    setDrawerState({ isOpen: true, mode: 'create', item: null });
+  };
+
+  const handleOpenEdit = (item) => {
+    if (item.status !== 'Tersimpan') return;
+    setDrawerState({ isOpen: true, mode: 'edit', item });
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const handleDrawerSubmit = (payload) => {
+    if (drawerState.mode === 'edit') {
+      onUpdateInventory?.(payload);
+    } else {
+      onCreateInventory?.(payload);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -44,9 +106,20 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
           </p>
         </div>
 
-        <div className="text-xs flex items-center gap-2 text-ink-2 bg-sheet border-[1.5px] border-line-strong px-3.5 py-2 rounded-[4px] shrink-0">
-          <span>Kapasitas Loker:</span>
-          <span className="font-bold text-ug-800 tabular-nums">14 / 30 Terpakai</span>
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="text-xs flex items-center gap-2 text-ink-2 bg-sheet border-[1.5px] border-line-strong px-3.5 py-2 rounded-[4px]">
+            <span>Kapasitas Loker:</span>
+            <span className="font-bold text-ug-800 tabular-nums">
+              {storedCount} / 30 Terpakai
+            </span>
+          </div>
+
+          {onCreateInventory && (
+            <Button variant="ug" size="md" onClick={handleOpenCreate}>
+              <LuPlus className="size-4" aria-hidden="true" />
+              <span>Tambah Inventori</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -62,8 +135,17 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari ID Inventori, nama barang, atau loker..."
-            className={`${INPUT_CLASS} h-10 pl-10`}
+            className={`${INPUT_CLASS} h-10 pl-10 ${searchQuery ? 'pr-16' : ''}`}
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-2 hover:text-ink cursor-pointer"
+            >
+              Hapus
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1 rounded-[4px] border-[1.5px] border-line-strong bg-paper p-1 text-xs">
@@ -92,80 +174,139 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
       </div>
 
       {/* Dossier Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {filteredInventory.map((item) => {
-          const isStored = item.status === 'Tersimpan';
-          return (
-            <div
-              key={item.id}
-              className={`rounded-[5px] p-5 flex flex-col justify-between ${
-                isStored
-                  ? 'border-[1.5px] border-ink/85 bg-sheet shadow-[3px_3px_0_var(--color-ink)]'
-                  : 'border-[1.5px] border-line bg-paper/60'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <span className="text-sm font-bold text-ug-800 tabular-nums">{item.id}</span>
-                  <StatusStamp status={item.status} size="sm" className="bg-sheet/80" />
+      {filteredInventory.length === 0 ? (
+        <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet py-14 px-6 text-center text-ink-3">
+          <LuArchive className="size-6 text-ink-3 mx-auto mb-2" aria-hidden="true" />
+          <p className="font-bold text-ink text-sm">
+            Tidak ada barang inventori yang sesuai pencarian.
+          </p>
+          <p className="text-xs text-ink-3 mt-1">
+            Coba ubah filter status, kata kunci, atau catat barang temuan baru.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {filteredInventory.map((item) => {
+            const isStored = item.status === 'Tersimpan';
+            const linkedTicket = linkedReportByInvId[item.id];
+            return (
+              <div
+                key={item.id}
+                className={`rounded-[5px] p-5 flex flex-col justify-between ${
+                  isStored
+                    ? 'border-[1.5px] border-ink/85 bg-sheet shadow-[3px_3px_0_var(--color-ink)]'
+                    : 'border-[1.5px] border-line bg-paper/60'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <span className="text-sm font-bold text-ug-800 tabular-nums">{item.id}</span>
+                    <StatusBadge status={item.status} />
+                  </div>
+
+                  <div className="flex gap-4 mb-4">
+                    <div className="w-20 h-20 rounded-[4px] bg-paper border-[1.5px] border-line-strong overflow-hidden shrink-0">
+                      {item.photoUrl ? (
+                        <img
+                          src={item.photoUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-ink-3">
+                          <LuArchive className="size-6" aria-hidden="true" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold text-ink line-clamp-1">{item.title}</h3>
+                      <span className="text-xs font-medium text-ink-3 block mt-0.5">
+                        {item.category}
+                      </span>
+                      <span className="bg-ug-100 text-ug-800 px-2 py-0.5 rounded-[3px] text-xs font-bold inline-block mt-1.5 tabular-nums">
+                        {item.storageLocker}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs text-ink-2 bg-paper p-3 rounded-[4px] border border-line">
+                    <div className="flex items-center gap-2">
+                      <LuMapPin className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
+                      <span className="line-clamp-1">{item.foundLocation}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <LuCalendar className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
+                      <span className="tabular-nums font-medium">{item.foundDate}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <LuUser className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
+                      <span className="line-clamp-1">Penemu: {item.finderName}</span>
+                    </div>
+                    {item.finderContact && (
+                      <div className="flex items-center gap-2">
+                        <LuPhone className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
+                        <span className="tabular-nums font-medium">{item.finderContact}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-ink-2 mt-3 line-clamp-2 leading-relaxed">
+                    &ldquo;{item.notes}&rdquo;
+                  </p>
                 </div>
 
-                <div className="flex gap-4 mb-4">
-                  <div className="w-20 h-20 rounded-[4px] bg-paper border-[1.5px] border-line-strong overflow-hidden shrink-0">
-                    <img
-                      src={item.photoUrl}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-ink line-clamp-1">{item.title}</h3>
-                    <span className="text-xs font-medium text-ink-3 block mt-0.5">
-                      {item.category}
+                <div className="mt-4 pt-3 border-t border-dotted border-line-strong flex items-center justify-between gap-2 flex-wrap text-xs">
+                  {linkedTicket ? (
+                    <span className="text-ug-700 font-semibold tabular-nums">
+                      Tertaut: {linkedTicket}
                     </span>
-                    <span className="bg-ug-100 text-ug-800 px-2 py-0.5 rounded-[3px] text-xs font-bold inline-block mt-1.5 tabular-nums">
-                      {item.storageLocker}
-                    </span>
-                  </div>
+                  ) : (
+                    <span />
+                  )}
+                  {isStored && (
+                    <div className="flex items-center gap-2">
+                      {onUpdateInventory && (
+                        <Button
+                          variant="subtle"
+                          size="sm"
+                          onClick={() => handleOpenEdit(item)}
+                        >
+                          <LuPencil className="size-4" aria-hidden="true" />
+                          <span>Edit</span>
+                        </Button>
+                      )}
+                      {onSelectToMatch && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onSelectToMatch(item.id)}
+                        >
+                          <span>Cocokkan Laporan</span>
+                          <LuArrowRight className="size-4" aria-hidden="true" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                <div className="space-y-1.5 text-xs text-ink-2 bg-paper p-3 rounded-[4px] border border-line">
-                  <div className="flex items-center gap-2">
-                    <LuMapPin className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
-                    <span className="line-clamp-1">{item.foundLocation}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <LuCalendar className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
-                    <span className="tabular-nums font-medium">{item.foundDate}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <LuUser className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
-                    <span className="line-clamp-1">Penemu: {item.finderName}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-ink-2 mt-3 line-clamp-2 leading-relaxed">
-                  &ldquo;{item.notes}&rdquo;
-                </p>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              <div className="mt-4 pt-3 border-t border-dotted border-line-strong flex items-center justify-between gap-2 text-xs">
-                <span className="text-ink-3 font-medium">Internal Only</span>
-                {isStored && onSelectToMatch && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onSelectToMatch(item.id)}
-                  >
-                    <span>Cocokkan Laporan</span>
-                    <LuArrowRight className="size-4" aria-hidden="true" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <AdminInventoryDrawer
+        isOpen={drawerState.isOpen}
+        mode={drawerState.mode}
+        initialItem={drawerState.item}
+        nextId={nextInventoryId}
+        inventoryList={inventoryList}
+        linkedReportTicket={
+          drawerState.item ? linkedReportByInvId[drawerState.item.id] || null : null
+        }
+        onClose={handleCloseDrawer}
+        onSubmit={handleDrawerSubmit}
+        onDelete={onDeleteInventory}
+      />
     </div>
   );
 };

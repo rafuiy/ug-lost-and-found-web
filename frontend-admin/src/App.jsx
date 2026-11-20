@@ -16,7 +16,11 @@ import { SecureFileModal } from './components/SecureFileModal';
 import { JsonViewerModal } from './components/JsonViewerModal';
 import { NotificationToast } from './components/NotificationToast';
 import { Button } from './components/ui/Button';
-import { clearStoredSession, getStoredSession } from './services/auth';
+import {
+  clearStoredSession,
+  getStoredSession,
+  isHighPrivilegeOfficer,
+} from './services/auth';
 import { LuLogOut } from 'react-icons/lu';
 
 const ADMIN_TAB_PATHS = {
@@ -62,6 +66,9 @@ export function App() {
     ticketCode: undefined,
   });
 
+  const isHighPrivilege = isHighPrivilegeOfficer(currentOfficer);
+  const effectiveTab = activeTab === 'audit' && !isHighPrivilege ? 'queue' : activeTab;
+
   useEffect(() => {
     const handlePopState = () => {
       setActiveTab(parseAdminTabFromPath(window.location.pathname));
@@ -75,12 +82,19 @@ export function App() {
       window.history.replaceState({}, '', '/login');
     } else if (currentOfficer && window.location.pathname === '/login') {
       window.history.replaceState({}, '', ADMIN_TAB_PATHS.queue);
+    } else if (
+      currentOfficer &&
+      !isHighPrivilege &&
+      (window.location.pathname === '/audit' || window.location.pathname === '/audit-log')
+    ) {
+      window.history.replaceState({}, '', ADMIN_TAB_PATHS.queue);
     }
-  }, [currentOfficer]);
+  }, [currentOfficer, isHighPrivilege]);
 
   const handleSelectTab = (tab) => {
-    setActiveTab(tab);
-    const targetPath = ADMIN_TAB_PATHS[tab];
+    const nextTab = tab === 'audit' && !isHighPrivilege ? 'queue' : tab;
+    setActiveTab(nextTab);
+    const targetPath = ADMIN_TAB_PATHS[nextTab];
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
@@ -211,6 +225,195 @@ export function App() {
     addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
   };
 
+  const handleRestoreStaleReport = (reportCode) => {
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+    setReports((prev) =>
+      prev.map((r) =>
+        r.ticketCode === reportCode
+          ? {
+              ...r,
+              isStale: false,
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Dipulihkan dari laporan lawas oleh ${officerLabel}.`,
+            }
+          : r
+      )
+    );
+
+    appendAuditLog('STALE_RESTORE', `reports: ${reportCode}`, reportCode, {
+      action: 'RESTORE_STALE_REPORT',
+      ticket_code: reportCode,
+      previous_is_stale: true,
+      new_is_stale: false,
+      restored_by: officerLabel,
+    });
+
+    addToast(
+      'success',
+      'Laporan Lawas Dipulihkan',
+      `Tiket ${reportCode} dikembalikan ke antrean aktif.`
+    );
+  };
+
+  const handleRevertToUnmatched = (reportCode, reason) => {
+    const target = reports.find((r) => r.ticketCode === reportCode);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+
+    setReports((prev) =>
+      prev.map((r) =>
+        r.ticketCode === reportCode
+          ? {
+              ...r,
+              status: 'Belum Ada',
+              matchedInventoryId: '',
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Verifikasi loket gagal (${reason}) — dikembalikan ke Belum Ada.`,
+            }
+          : r
+      )
+    );
+
+    appendAuditLog('STATUS_REVERT', `reports: ${reportCode}`, reportCode, {
+      action: 'REVERT_VERIFICATION_FAILED',
+      ticket_code: reportCode,
+      previous_status: target?.status || 'Perlu Verifikasi',
+      new_status: 'Belum Ada',
+      reason,
+      inventory_retained_status: 'Tersimpan',
+      officer: officerLabel,
+    });
+
+    addToast(
+      'warning',
+      'Dikembalikan ke Belum Ada',
+      `Tiket ${reportCode} dikembalikan ke antrean. Inventori tetap Tersimpan.`
+    );
+  };
+
+  const handleReopenRejectedReport = (reportCode, { reason }) => {
+    const target = reports.find((r) => r.ticketCode === reportCode);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+    const resubmitToken = `RST-${reportCode.replace(/[^A-Z0-9]/gi, '')}-${Date.now()
+      .toString(36)
+      .toUpperCase()}`;
+    const resubmitLink = `/lapor?reopen=${resubmitToken}`;
+
+    setReports((prev) =>
+      prev.map((r) =>
+        r.ticketCode === reportCode
+          ? {
+              ...r,
+              status: 'Dibatalkan',
+              cancelledFrom: 'Ditolak',
+              cancelReason: reason,
+              cancelledBy: officerLabel,
+              cancelEmailType: 'RESUBMIT_INVITATION',
+              resubmitLink,
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Status Ditolak dibatalkan menjadi Dibatalkan oleh ${officerLabel} (${reason}). Email tombol Ajukan Ulang dikirim ke ${r.reporterEmail}.`,
+            }
+          : r
+      )
+    );
+
+    appendAuditLog('STATUS_REVERT', `reports: ${reportCode}`, reportCode, {
+      action: 'CANCEL_REJECTED_REPORT',
+      ticket_code: reportCode,
+      previous_status: target?.status || 'Ditolak',
+      new_status: 'Dibatalkan',
+      reason,
+      email_type: 'RESUBMIT_INVITATION',
+      resubmit_link: resubmitLink,
+      officer: officerLabel,
+    });
+
+    addToast(
+      'success',
+      'Status Ditolak → Dibatalkan',
+      `Tiket ${reportCode} diubah menjadi Dibatalkan. Email khusus berisi tombol Ajukan Ulang telah dikirim ke ${target?.reporterEmail}.`
+    );
+  };
+
+  const handleVoidHandover = (
+    reportCode,
+    { reason, restoreInventory, includeResubmitLink }
+  ) => {
+    const target = reports.find((r) => r.ticketCode === reportCode);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+    const matchedInvId = target?.matchedInventoryId || '';
+    const resubmitLink = includeResubmitLink
+      ? `/lapor?reopen=VOID-${reportCode.replace(/[^A-Z0-9]/gi, '')}-${Date.now()
+          .toString(36)
+          .toUpperCase()}`
+      : null;
+
+    setReports((prev) =>
+      prev.map((r) =>
+        r.ticketCode === reportCode
+          ? {
+              ...r,
+              status: 'Dibatalkan',
+              cancelledFrom: 'Selesai',
+              cancelReason: reason,
+              cancelledBy: officerLabel,
+              cancelEmailType: 'ERROR_CLARIFICATION',
+              resubmitLink,
+              matchedInventoryId: '',
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Status Selesai dibatalkan menjadi Dibatalkan oleh ${officerLabel} (${reason}). Email pemberitahuan kesalahan dikirim ke ${r.reporterEmail}.`,
+            }
+          : r
+      )
+    );
+
+    if (restoreInventory && matchedInvId) {
+      setInventoryList((prev) =>
+        prev.map((inv) =>
+          inv.id === matchedInvId
+            ? {
+                ...inv,
+                status: 'Tersimpan',
+                notes: `${inv.notes} [SERAH TERIMA DIBATALKAN: ${reason}]`,
+              }
+            : inv
+        )
+      );
+    }
+
+    appendAuditLog('HANDOVER_VOID', `reports: ${reportCode}`, reportCode, {
+      action: 'CANCEL_COMPLETED_REPORT',
+      ticket_code: reportCode,
+      previous_status: target?.status || 'Selesai',
+      new_status: 'Dibatalkan',
+      reason,
+      matched_inventory_id: matchedInvId || 'N/A',
+      inventory_restored_to_tersimpan: Boolean(restoreInventory && matchedInvId),
+      email_type: 'ERROR_CLARIFICATION',
+      resubmit_link: resubmitLink,
+      officer: officerLabel,
+    });
+
+    addToast(
+      'warning',
+      'Status Selesai → Dibatalkan',
+      `Tiket ${reportCode} diubah menjadi Dibatalkan${
+        restoreInventory && matchedInvId ? ' & inventori kembali Tersimpan' : ''
+      }. Email pemberitahuan kesalahan telah dikirim ke ${target?.reporterEmail}.`
+    );
+  };
+
   const handleSaveNotes = (reportCode, notes) => {
     setReports((prev) =>
       prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
@@ -219,21 +422,32 @@ export function App() {
   };
 
   const handleCompleteHandover = (params) => {
-    let matchedInvId;
+    const target = reports.find((r) => r.ticketCode === params.ticketCode);
+    if (!target || target.status !== 'Perlu Verifikasi') {
+      addToast(
+        'error',
+        'Serah Terima Ditolak',
+        'Hanya tiket berstatus Perlu Verifikasi yang dapat diserahterimakan.'
+      );
+      return;
+    }
+
+    const matchedInvId = params.inventoryId || target.matchedInventoryId;
     setReports((prev) =>
-      prev.map((r) => {
-        if (r.ticketCode === params.ticketCode) {
-          matchedInvId = r.matchedInventoryId;
-          return {
-            ...r,
-            status: 'Selesai',
-            adminNotes: `${r.adminNotes ? r.adminNotes + ' | ' : ''}Serah terima selesai kepada ${
-              params.recipientName
-            } (${params.recipientNpm}). Catatan: ${params.notes}`,
-          };
-        }
-        return r;
-      })
+      prev.map((r) =>
+        r.ticketCode === params.ticketCode
+          ? {
+              ...r,
+              status: 'Selesai',
+              matchedInventoryId: matchedInvId || r.matchedInventoryId,
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Serah terima selesai kepada ${params.recipientName} (${
+                params.recipientNpm
+              }). Catatan: ${params.notes}`,
+            }
+          : r
+      )
     );
 
     if (matchedInvId) {
@@ -295,6 +509,111 @@ export function App() {
     }
   };
 
+  const handleCreateInventory = (newItem) => {
+    setInventoryList((prev) => [newItem, ...prev]);
+
+    appendAuditLog('INV_CREATE', `inventories: ${newItem.id}`, newItem.id, {
+      action: 'REGISTER_FOUND_ITEM',
+      inventory_id: newItem.id,
+      item_title: newItem.title,
+      category: newItem.category,
+      storage_location: newItem.storageLocker,
+      found_location: newItem.foundLocation,
+      found_date: newItem.foundDate,
+      finder: newItem.finderName,
+      finder_contact: newItem.finderContact || null,
+      registered_by: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
+    });
+
+    addToast(
+      'success',
+      'Inventori Ditambahkan',
+      `[${newItem.id}] ${newItem.title} tersimpan di ${newItem.storageLocker}.`
+    );
+  };
+
+  const handleUpdateInventory = (updatedItem) => {
+    setInventoryList((prev) =>
+      prev.map((inv) =>
+        inv.id === updatedItem.id && inv.status === 'Tersimpan' ? updatedItem : inv
+      )
+    );
+
+    appendAuditLog('INV_UPDATE', `inventories: ${updatedItem.id}`, updatedItem.id, {
+      action: 'UPDATE_FOUND_ITEM',
+      inventory_id: updatedItem.id,
+      item_title: updatedItem.title,
+      category: updatedItem.category,
+      storage_location: updatedItem.storageLocker,
+      found_location: updatedItem.foundLocation,
+      found_date: updatedItem.foundDate,
+      finder: updatedItem.finderName,
+      finder_contact: updatedItem.finderContact || null,
+      updated_by: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
+    });
+
+    addToast(
+      'info',
+      'Inventori Diperbarui',
+      `Detail barang [${updatedItem.id}] berhasil disimpan.`
+    );
+  };
+
+  const handleDeleteInventory = (inventoryId, reason) => {
+    const targetItem = inventoryList.find((inv) => inv.id === inventoryId);
+    const linkedReport = reports.find((r) => r.matchedInventoryId === inventoryId);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+
+    setInventoryList((prev) => prev.filter((inv) => inv.id !== inventoryId));
+
+    if (linkedReport) {
+      setReports((prev) =>
+        prev.map((r) =>
+          r.matchedInventoryId === inventoryId
+            ? {
+                ...r,
+                matchedInventoryId: '',
+                status: r.status === 'Perlu Verifikasi' ? 'Belum Ada' : r.status,
+                adminNotes: `${
+                  r.adminNotes ? r.adminNotes + ' | ' : ''
+                }Inventori tertaut [${inventoryId}] dihapus oleh ${officerLabel} (${reason})${
+                  r.status === 'Perlu Verifikasi' ? ' — status dikembalikan ke Belum Ada.' : '.'
+                }`,
+              }
+            : r
+        )
+      );
+    }
+
+    appendAuditLog('INV_DELETE', `inventories: ${inventoryId}`, inventoryId, {
+      action: 'DELETE_FOUND_ITEM',
+      inventory_id: inventoryId,
+      item_title: targetItem?.title || 'N/A',
+      storage_location: targetItem?.storageLocker || 'N/A',
+      reason,
+      unlinked_ticket: linkedReport?.ticketCode || null,
+      reverted_ticket_to_belum_ada:
+        linkedReport?.status === 'Perlu Verifikasi' ? linkedReport.ticketCode : null,
+      deleted_by: officerLabel,
+    });
+
+    addToast(
+      'warning',
+      'Inventori Dihapus',
+      `Barang [${inventoryId}] berhasil dihapus dari inventori.${
+        linkedReport
+          ? ` Tautan tiket ${linkedReport.ticketCode} dilepas${
+              linkedReport.status === 'Perlu Verifikasi'
+                ? ' & dikembalikan ke Belum Ada'
+                : ''
+            }.`
+          : ''
+      }`
+    );
+  };
+
   const handleLoginSuccess = (officer) => {
     setCurrentOfficer(officer);
     setLoginNotice('');
@@ -333,6 +652,7 @@ export function App() {
     perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
     lawas: reports.filter((r) => r.isStale).length,
     selesai: reports.filter((r) => r.status === 'Selesai').length,
+    dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
   };
 
   return (
@@ -345,15 +665,16 @@ export function App() {
       </a>
 
       <AdminNavbar
-        activeTab={activeTab}
+        activeTab={effectiveTab}
         onSelectTab={handleSelectTab}
         onLogoutClick={() => setIsLogoutModalOpen(true)}
         queueCount={statsCounts.belumAda}
         officer={currentOfficer}
+        canViewAudit={isHighPrivilege}
       />
 
       <main id="konten" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
-        {activeTab === 'queue' && (
+        {effectiveTab === 'queue' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-line-strong">
               <div>
@@ -381,14 +702,18 @@ export function App() {
           </div>
         )}
 
-        {activeTab === 'inventory' && (
+        {effectiveTab === 'inventory' && (
           <AdminInventoryPage
             inventoryList={inventoryList}
+            reports={reports}
             onSelectToMatch={handleSelectToMatchFromInventory}
+            onCreateInventory={handleCreateInventory}
+            onUpdateInventory={handleUpdateInventory}
+            onDeleteInventory={handleDeleteInventory}
           />
         )}
 
-        {activeTab === 'handover' && (
+        {effectiveTab === 'handover' && (
           <AdminHandoverPage
             key={handoverPreloadTicket || 'default'}
             reports={reports}
@@ -399,7 +724,7 @@ export function App() {
           />
         )}
 
-        {activeTab === 'audit' && (
+        {effectiveTab === 'audit' && isHighPrivilege && (
           <AdminAuditLogPage
             logs={auditLogs}
             onOpenJsonModal={(entry) => setActiveJsonLog(entry)}
@@ -421,11 +746,16 @@ export function App() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         inventoryList={inventoryList}
+        canRestoreStale={isHighPrivilege}
         onIssueInvitation={handleIssueInvitation}
         onRejectReport={(code, reason) => {
           handleRejectReport(code, reason);
           setIsDrawerOpen(false);
         }}
+        onRestoreStaleReport={handleRestoreStaleReport}
+        onRevertToUnmatched={handleRevertToUnmatched}
+        onReopenRejectedReport={handleReopenRejectedReport}
+        onVoidHandover={handleVoidHandover}
         onSaveNotes={handleSaveNotes}
         onOpenSecureFile={handleOpenSecureFile}
         onGoToHandover={handleGoToHandoverFromDrawer}

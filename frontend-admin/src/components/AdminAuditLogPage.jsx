@@ -124,6 +124,10 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
               <option value="REPORT_REJECT">REPORT_REJECT</option>
               <option value="STALE_FLAGGED">STALE_FLAGGED</option>
               <option value="INV_MATCH">INV_MATCH</option>
+              <option value="INV_CREATE">INV_CREATE</option>
+              <option value="INV_UPDATE">INV_UPDATE</option>
+              <option value="STALE_RESTORE">STALE_RESTORE</option>
+              <option value="STATUS_REVERT">STATUS_REVERT</option>
             </select>
           </div>
 

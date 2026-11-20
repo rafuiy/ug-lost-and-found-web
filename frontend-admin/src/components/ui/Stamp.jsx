@@ -13,6 +13,7 @@ const STATUS_TONES = {
   'Perlu Verifikasi': 'ug',
   Selesai: 'ok',
   Ditolak: 'danger',
+  Dibatalkan: 'neutral',
   Tersimpan: 'ug',
   Diambil: 'ok',
 };

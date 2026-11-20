@@ -72,6 +72,7 @@ export const AdminReportQueue = ({
     perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
     selesai: reports.filter((r) => r.status === 'Selesai').length,
     ditolak: reports.filter((r) => r.status === 'Ditolak').length,
+    dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
     lawas: reports.filter((r) => r.isStale).length,
   };
 
@@ -170,6 +171,7 @@ export const AdminReportQueue = ({
               { key: 'Perlu Verifikasi', label: `Perlu Verifikasi (${counts.perluVerifikasi})` },
               { key: 'Selesai', label: `Selesai (${counts.selesai})` },
               { key: 'Ditolak', label: `Ditolak (${counts.ditolak})` },
+              { key: 'Dibatalkan', label: `Dibatalkan (${counts.dibatalkan})` },
             ].map((tab) => {
               const isActive = activeFilterTab === tab.key;
               return (
