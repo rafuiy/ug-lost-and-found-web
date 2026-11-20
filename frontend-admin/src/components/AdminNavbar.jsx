@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import {
   LuLogOut,
-  LuArchive,
-  LuClipboardList,
-  LuClipboardCheck,
-  LuClock,
   LuMenu,
   LuX,
 } from 'react-icons/lu';
+
+const DEFAULT_OFFICER = {
+  name: 'Budi Santoso',
+  id: 'ADM-04D',
+  desk: 'Loket D',
+};
 
 export const AdminNavbar = ({
   activeTab,
   onSelectTab,
   onLogoutClick,
   queueCount = 0,
+  officer = DEFAULT_OFFICER,
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -21,23 +24,19 @@ export const AdminNavbar = ({
     {
       id: 'queue',
       label: 'Antrean Laporan',
-      icon: <LuClipboardList className="size-4 shrink-0" aria-hidden="true" />,
       count: queueCount,
     },
     {
       id: 'inventory',
       label: 'Inventori Temuan',
-      icon: <LuArchive className="size-4 shrink-0" aria-hidden="true" />,
     },
     {
       id: 'handover',
       label: 'Serah Terima',
-      icon: <LuClipboardCheck className="size-4 shrink-0" aria-hidden="true" />,
     },
     {
       id: 'audit',
       label: 'Audit Log',
-      icon: <LuClock className="size-4 shrink-0" aria-hidden="true" />,
     },
   ];
 
@@ -47,7 +46,7 @@ export const AdminNavbar = ({
   };
 
   return (
-    <header className="on-ug sticky top-0 z-40 w-full bg-ug-800 text-sheet border-b-2 border-ug-950 select-none">
+    <header className="on-ug sticky top-0 z-40 w-full bg-ug-950 text-sheet border-b border-ug-800 select-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Brand + Nav */}
@@ -55,16 +54,15 @@ export const AdminNavbar = ({
             <button
               type="button"
               onClick={() => handleSelect('queue')}
-              className="inline-flex items-center gap-2 rounded-[3px] text-left cursor-pointer"
+              className="inline-flex items-center gap-2.5 rounded-[3px] text-left cursor-pointer"
             >
-              <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-[15px] font-bold text-ug-950">
-                UG
-              </span>
+              <img
+                src="/Logo%20Gunadarma.webp"
+                alt="Logo Universitas Gunadarma"
+                className="size-9 object-contain shrink-0"
+              />
               <span className="text-[15px] font-bold tracking-tight text-sheet">
                 Lost&nbsp;&amp;&nbsp;Found
-              </span>
-              <span className="hidden sm:inline-block border-l border-sheet/30 pl-2.5 text-xs font-semibold text-sheet/75">
-                Panel Loket
               </span>
             </button>
 
@@ -83,7 +81,6 @@ export const AdminNavbar = ({
                         : 'border-transparent text-sheet/80 hover:text-sheet font-semibold'
                     }`}
                   >
-                    {item.icon}
                     <span>{item.label}</span>
                     {typeof item.count === 'number' && item.count > 0 && (
                       <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-[11px] font-bold text-ug-950 tabular-nums leading-none">
@@ -101,10 +98,10 @@ export const AdminNavbar = ({
             <div className="hidden sm:flex items-center gap-2.5 pr-3 border-r border-sheet/25">
               <div className="text-right">
                 <div className="text-xs font-bold text-sheet leading-tight">
-                  Budi Santoso
+                  {officer.name}
                 </div>
-                <div className="text-[11px] font-medium text-sheet/75 tabular-nums">
-                  Loket D · ADM-04D
+                <div className="text-[11px] font-medium text-ug-200/80 tabular-nums">
+                  {officer.desk} · {officer.id}
                 </div>
               </div>
             </div>
@@ -136,7 +133,7 @@ export const AdminNavbar = ({
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="md:hidden bg-ug-900 border-t border-sheet/15 px-4 py-3 space-y-1 text-sheet">
+        <div className="md:hidden bg-ug-900 border-t border-ug-800 px-4 py-3 space-y-1 text-sheet">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -150,10 +147,7 @@ export const AdminNavbar = ({
                     : 'border-transparent pl-3 text-sheet/85 hover:text-sheet font-medium'
                 }`}
               >
-                <span className="flex items-center gap-2">
-                  {item.icon}
-                  {item.label}
-                </span>
+                <span>{item.label}</span>
                 {typeof item.count === 'number' && item.count > 0 && (
                   <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-[11px] font-bold text-ug-950 tabular-nums leading-none">
                     {item.count}
@@ -163,8 +157,8 @@ export const AdminNavbar = ({
             );
           })}
           <div className="pt-2.5 mt-2 border-t border-sheet/15 flex items-center justify-between px-3 py-1">
-            <span className="text-xs text-sheet/75 tabular-nums">
-              Budi Santoso (ADM-04D)
+            <span className="text-xs text-ug-200/80 tabular-nums">
+              {officer.name} ({officer.id})
             </span>
             <button
               type="button"

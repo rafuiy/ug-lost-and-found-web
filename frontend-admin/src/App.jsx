@@ -11,10 +11,12 @@ import { AdminReviewDrawer } from './components/AdminReviewDrawer';
 import { AdminHandoverPage } from './components/AdminHandoverPage';
 import { AdminAuditLogPage } from './components/AdminAuditLogPage';
 import { AdminInventoryPage } from './components/AdminInventoryPage';
+import { AdminLoginPage } from './components/AdminLoginPage';
 import { SecureFileModal } from './components/SecureFileModal';
 import { JsonViewerModal } from './components/JsonViewerModal';
 import { NotificationToast } from './components/NotificationToast';
 import { Button } from './components/ui/Button';
+import { clearStoredSession, getStoredSession } from './services/auth';
 import { LuLogOut } from 'react-icons/lu';
 
 const ADMIN_TAB_PATHS = {
@@ -33,6 +35,8 @@ function parseAdminTabFromPath(pathname) {
 }
 
 export function App() {
+  const [currentOfficer, setCurrentOfficer] = useState(() => getStoredSession());
+  const [loginNotice, setLoginNotice] = useState('');
   const [activeTab, setActiveTab] = useState(() =>
     parseAdminTabFromPath(window.location.pathname)
   );
@@ -66,6 +70,14 @@ export function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (!currentOfficer && window.location.pathname !== '/login') {
+      window.history.replaceState({}, '', '/login');
+    } else if (currentOfficer && window.location.pathname === '/login') {
+      window.history.replaceState({}, '', ADMIN_TAB_PATHS.queue);
+    }
+  }, [currentOfficer]);
+
   const handleSelectTab = (tab) => {
     setActiveTab(tab);
     const targetPath = ADMIN_TAB_PATHS[tab];
@@ -97,8 +109,8 @@ export function App() {
     targetTable,
     targetId,
     payload,
-    actorName = 'Budi Santoso',
-    actorId = 'ADM-04D'
+    actorName = currentOfficer?.name || 'Budi Santoso',
+    actorId = currentOfficer?.id || 'ADM-04D'
   ) => {
     const now = new Date();
     const formattedTimestamp = now.toISOString().replace('T', ' ').slice(0, 19) + ' WIB';
@@ -193,7 +205,7 @@ export function App() {
       previous_status: target?.status || 'Belum Ada',
       new_status: 'Ditolak',
       reason,
-      officer: 'Budi Santoso (ADM-04D)',
+      officer: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
     });
 
     addToast('warning', 'Laporan Ditolak', `Tiket ${reportCode} telah ditolak.`);
@@ -250,7 +262,7 @@ export function App() {
       ktm_verified_physically: true,
       secret_feature_proven: true,
       photo_evidence_uploaded: true,
-      officer: 'Budi Santoso (ADM-04D)',
+      officer: `${currentOfficer?.name || 'Budi Santoso'} (${currentOfficer?.id || 'ADM-04D'})`,
       desk: 'Loket D Margonda',
     });
 
@@ -283,6 +295,39 @@ export function App() {
     }
   };
 
+  const handleLoginSuccess = (officer) => {
+    setCurrentOfficer(officer);
+    setLoginNotice('');
+    setActiveTab('queue');
+    if (window.location.pathname !== ADMIN_TAB_PATHS.queue) {
+      window.history.pushState({}, '', ADMIN_TAB_PATHS.queue);
+    }
+    addToast('success', 'Sesi Dimulai', `Selamat bertugas, ${officer.name} (${officer.id}).`);
+  };
+
+  const handleConfirmLogout = () => {
+    clearStoredSession();
+    setIsLogoutModalOpen(false);
+    setIsDrawerOpen(false);
+    setSecureFileModal((prev) => ({ ...prev, isOpen: false }));
+    setActiveJsonLog(null);
+    setSelectedTicketCode(null);
+    setCurrentOfficer(null);
+    setLoginNotice('Sesi petugas telah diakhiri. Silakan masuk kembali untuk mengakses panel.');
+    if (window.location.pathname !== '/login') {
+      window.history.pushState({}, '', '/login');
+    }
+  };
+
+  if (!currentOfficer) {
+    return (
+      <AdminLoginPage
+        onLoginSuccess={handleLoginSuccess}
+        sessionNotice={loginNotice}
+      />
+    );
+  }
+
   const statsCounts = {
     belumAda: reports.filter((r) => r.status === 'Belum Ada').length,
     perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
@@ -294,7 +339,7 @@ export function App() {
     <div className="min-h-svh bg-paper text-ink flex flex-col font-sans">
       <a
         href="#konten"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[4px] focus:bg-gold focus:px-4 focus:py-2 focus:font-bold focus:text-ug-950"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-sm focus:bg-gold focus:px-4 focus:py-2 focus:font-bold focus:text-ug-950"
       >
         Lewati ke konten
       </a>
@@ -304,12 +349,13 @@ export function App() {
         onSelectTab={handleSelectTab}
         onLogoutClick={() => setIsLogoutModalOpen(true)}
         queueCount={statsCounts.belumAda}
+        officer={currentOfficer}
       />
 
       <main id="konten" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
         {activeTab === 'queue' && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b-2 border-ink">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-line-strong">
               <div>
                 <h1 className="text-2xl font-bold text-ink tracking-[-0.03em]">
                   Antrean Laporan Mahasiswa
@@ -319,16 +365,12 @@ export function App() {
                 </p>
               </div>
 
-              <span className="text-xs font-semibold text-ink-2 bg-sheet px-3 py-1.5 rounded-[4px] border-[1.5px] border-line-strong tabular-nums shrink-0">
+              <span className="text-xs font-semibold text-ink-2 bg-sheet px-3 py-1.5 rounded-sm border-[1.5px] border-line-strong tabular-nums shrink-0">
                 Shift Loket D · 08:00 - 16:00 WIB
               </span>
             </div>
 
-            <AdminStatsCards
-              activeFilter={activeFilterTab}
-              onFilterSelect={(filter) => setActiveFilterTab(filter)}
-              counts={statsCounts}
-            />
+            <AdminStatsCards counts={statsCounts} />
 
             <AdminReportQueue
               reports={reports}
@@ -365,13 +407,12 @@ export function App() {
         )}
       </main>
 
-      <footer className="border-t-2 border-ink bg-paper mt-12">
-        <div className="max-w-7xl mx-auto flex flex-col gap-2 px-4 sm:px-6 py-6 text-[13px] text-ink-3 md:flex-row md:items-baseline md:gap-8">
+      <footer className="border-t border-line-strong bg-sheet/70 mt-12">
+        <div className="max-w-7xl mx-auto flex flex-col gap-2 px-4 sm:px-6 py-6 text-[13px] text-ink-3 md:flex-row md:items-baseline md:justify-between">
           <span className="font-bold text-ink">
             UG Lost &amp; Found — Panel Petugas Loket
           </span>
-          <p>Loket D Margonda · 08:00 - 16:00 WIB</p>
-          <p className="md:ml-auto">Layanan internal Universitas Gunadarma</p>
+          <p>Layanan internal Universitas Gunadarma</p>
         </div>
       </footer>
 
@@ -405,18 +446,18 @@ export function App() {
 
       {isLogoutModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ug-950/65">
-          <div className="bg-sheet border-2 border-ink rounded-[5px] p-6 max-w-sm w-full shadow-[6px_6px_0_var(--color-ink)] space-y-4">
+          <div className="bg-sheet border-2 border-ink rounded-[5px] p-6 max-w-sm w-full shadow-[4px_4px_0_var(--color-ink)] space-y-4">
             <div className="flex items-start gap-3">
               <LuLogOut className="size-5 text-danger shrink-0 mt-0.5" aria-hidden="true" />
               <div>
                 <h3 className="text-base font-bold text-ink">Konfirmasi Keluar</h3>
                 <p className="text-xs text-ink-3 mt-0.5">
-                  Sesi Petugas Loket D (Budi Santoso)
+                  Sesi Petugas {currentOfficer.desk} ({currentOfficer.name})
                 </p>
               </div>
             </div>
 
-            <p className="text-xs text-ink-2 bg-paper p-3.5 rounded-[4px] border border-line-strong leading-relaxed">
+            <p className="text-xs text-ink-2 bg-paper p-3.5 rounded-sm border border-line-strong leading-relaxed">
               Seluruh perubahan status dan log audit yang telah dieksekusi tersimpan aman.
             </p>
 
@@ -431,10 +472,7 @@ export function App() {
               <Button
                 variant="ug"
                 size="sm"
-                onClick={() => {
-                  setIsLogoutModalOpen(false);
-                  addToast('info', 'Sesi Diakhiri', 'Logout berhasil dari Panel Petugas Loket.');
-                }}
+                onClick={handleConfirmLogout}
               >
                 Keluar Sesi
               </Button>

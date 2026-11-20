@@ -34,7 +34,7 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b-2 border-ink">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-line-strong">
         <div>
           <h1 className="text-2xl font-bold text-ink tracking-[-0.03em]">
             Inventori Barang Temuan
@@ -51,7 +51,7 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
       </div>
 
       {/* Toolbar */}
-      <div className="rounded-[5px] border-2 border-ink bg-sheet p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <LuSearch
             className="size-4 text-ink-3 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -80,7 +80,7 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
                 onClick={() => setStatusFilter(status)}
                 className={`px-3 py-1.5 rounded-[3px] transition-colors tabular-nums cursor-pointer ${
                   isActive
-                    ? 'bg-ug-800 text-sheet font-bold'
+                    ? 'bg-ug-950 text-sheet font-bold'
                     : 'text-ink-2 hover:text-ink font-semibold'
                 }`}
               >
@@ -100,8 +100,8 @@ export const AdminInventoryPage = ({ inventoryList, onSelectToMatch }) => {
               key={item.id}
               className={`rounded-[5px] p-5 flex flex-col justify-between ${
                 isStored
-                  ? 'border-2 border-ink bg-sheet shadow-[4px_4px_0_var(--color-ink)]'
-                  : 'border-[1.5px] border-line-strong bg-paper/70'
+                  ? 'border-[1.5px] border-ink/85 bg-sheet shadow-[3px_3px_0_var(--color-ink)]'
+                  : 'border-[1.5px] border-line bg-paper/60'
               }`}
             >
               <div>

@@ -28,7 +28,7 @@ export const NotificationToast = ({ toasts, onDismiss }) => {
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto p-4 rounded-[5px] border-2 shadow-[4px_4px_0_var(--color-ink)] ${styleClass} flex items-start gap-3`}
+            className={`pointer-events-auto p-4 rounded-[5px] border-[1.5px] shadow-[3px_3px_0_var(--color-ink)] ${styleClass} flex items-start gap-3`}
           >
             <div className="shrink-0 mt-0.5">{icon}</div>
             <div className="flex-1 text-xs">

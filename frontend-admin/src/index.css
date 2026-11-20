@@ -16,13 +16,13 @@
   --color-gold-ink: #7a5800;
   --color-gold-wash: #fbefc4;
 
-  --color-paper: #f7f3ea;
-  --color-sheet: #fffdf8;
+  --color-paper: #f3f2f7;
+  --color-sheet: #ffffff;
   --color-ink: #1e1030;
-  --color-ink-2: #4a4058;
-  --color-ink-3: #6b6178;
-  --color-line: #e2dacb;
-  --color-line-strong: #c8bfae;
+  --color-ink-2: #4e465e;
+  --color-ink-3: #6c647c;
+  --color-line: #e2dfec;
+  --color-line-strong: #c3bcd4;
 
   --color-ok: #1c7c45;
   --color-ok-wash: #e2f1e7;
@@ -76,7 +76,7 @@
   .edge-torn {
     height: 16px;
     /* fill must match --color-paper; first and last peak share a height so the tile repeats seamlessly */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='16'%3E%3Cpolygon points='0,8 4,3 8,10 13,2 17,9 22,5 26,12 31,3 35,8 40,1 44,11 49,4 53,9 57,3 60,8 60,16 0,16' fill='%23f7f3ea'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='16'%3E%3Cpolygon points='0,8 4,3 8,10 13,2 17,9 22,5 26,12 31,3 35,8 40,1 44,11 49,4 53,9 57,3 60,8 60,16 0,16' fill='%23f3f2f7'/%3E%3C/svg%3E");
     background-size: 60px 16px;
     background-repeat: repeat-x;
   }

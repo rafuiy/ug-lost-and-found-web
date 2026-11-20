@@ -66,7 +66,7 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b-2 border-ink">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-line-strong">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-ink tracking-[-0.03em]">
@@ -94,7 +94,7 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-[5px] border-2 border-ink bg-sheet p-4">
+      <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
             <LuSearch
@@ -145,11 +145,11 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
       </div>
 
       {/* Table */}
-      <div className="rounded-[5px] border-2 border-ink bg-sheet shadow-[6px_6px_0_var(--color-ink)] overflow-hidden">
+      <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className="bg-paper border-b-2 border-ink text-[11px] font-bold text-ink-2 uppercase tracking-[0.08em]">
+              <tr className="bg-paper border-b-[1.5px] border-line-strong text-[11px] font-bold text-ink-2 uppercase tracking-[0.08em]">
                 <th className="py-3.5 px-5 w-48">Timestamp (WIB)</th>
                 <th className="py-3.5 px-4 w-48">Petugas / Aktor</th>
                 <th className="py-3.5 px-4 w-44">Aksi</th>

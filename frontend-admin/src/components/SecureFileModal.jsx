@@ -15,13 +15,13 @@ export const SecureFileModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ug-950/65">
-      <div className="bg-sheet border-2 border-ink rounded-[5px] shadow-[6px_6px_0_var(--color-ink)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="on-ug px-6 py-4 bg-ug-800 text-sheet border-b-2 border-ug-950 flex items-center justify-between gap-4">
+      <div className="bg-sheet border-2 border-ink rounded-[5px] shadow-[4px_4px_0_var(--color-ink)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="on-ug px-6 py-4 bg-ug-950 text-sheet border-b border-ug-800 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <LuLock className="size-5 text-gold shrink-0" aria-hidden="true" />
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-sheet truncate">{title}</h3>
-              <p className="text-xs text-sheet/75 tabular-nums truncate">
+              <p className="text-xs text-ug-200/80 tabular-nums truncate">
                 {ticketCode ? `Tiket: ${ticketCode}` : 'Dokumen Rahasia'} · {studentName} ({studentNpm})
               </p>
             </div>
@@ -45,7 +45,7 @@ export const SecureFileModal = ({
         </div>
 
         <div className="p-6 bg-paper flex-1 flex flex-col items-center justify-center overflow-auto min-h-[300px]">
-          <div className="relative border-2 border-ink bg-sheet rounded-[4px] overflow-hidden max-h-[460px]">
+          <div className="relative border-[1.5px] border-line-strong bg-sheet rounded-[4px] overflow-hidden max-h-[460px]">
             <img
               src={fileUrl}
               alt={title}

@@ -78,9 +78,9 @@ function DrawerContent({
       <div className="absolute inset-0 bg-ug-950/55 transition-opacity" onClick={onClose} />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-8 sm:pl-10">
-        <div className="w-screen max-w-2xl bg-paper border-l-2 border-ink flex flex-col h-full">
+        <div className="w-screen max-w-2xl bg-paper border-l-2 border-ug-950 flex flex-col h-full">
           {/* Header */}
-          <div className="on-ug px-6 py-5 bg-ug-800 text-sheet border-b-2 border-ug-950 flex items-start justify-between gap-4 shrink-0">
+          <div className="on-ug px-6 py-5 bg-ug-950 text-sheet border-b border-ug-800 flex items-start justify-between gap-4 shrink-0">
             <div>
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="rounded-[3px] bg-gold px-2 py-0.5 text-xs font-bold text-ug-950 tabular-nums">
@@ -97,7 +97,7 @@ function DrawerContent({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-sheet/75 tabular-nums mt-1.5">
+              <p className="text-xs text-ug-200/80 tabular-nums mt-1.5">
                 Diajukan {report.reportedAt} WIB
               </p>
             </div>
@@ -450,7 +450,7 @@ function DrawerContent({
           </div>
 
           {/* Sticky Bottom Bar */}
-          <div className="p-4 sm:p-5 bg-sheet border-t-2 border-ink shrink-0 space-y-2.5">
+          <div className="p-4 sm:p-5 bg-sheet border-t-[1.5px] border-line-strong shrink-0 space-y-2.5">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <Button
                 variant="gold"

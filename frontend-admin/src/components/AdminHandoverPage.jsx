@@ -176,13 +176,13 @@ export const AdminHandoverPage = ({
         <span className="text-xs font-semibold text-ink-3">Loket D Margonda</span>
       </div>
 
-      <div className="rounded-[5px] border-2 border-ink bg-sheet shadow-[6px_6px_0_var(--color-ink)] overflow-hidden">
+      <div className="rounded-[5px] border-[1.5px] border-ink bg-sheet shadow-[4px_4px_0_var(--color-ink)] overflow-hidden">
         {/* Sheet Header Band */}
-        <div className="on-ug bg-ug-800 text-sheet px-6 py-5 sm:px-8 border-b-2 border-ug-950">
+        <div className="on-ug bg-ug-950 text-sheet px-6 py-5 sm:px-8 border-b border-ug-800">
           <h1 className="text-xl sm:text-2xl font-bold tracking-[-0.03em]">
             Proses Serah Terima Barang
           </h1>
-          <p className="text-sm text-sheet/80 mt-1">
+          <p className="text-sm text-ug-200/85 mt-1">
             Verifikasi identitas fisik KTM dan dokumentasikan penyerahan barang di loket.
           </p>
         </div>
@@ -203,7 +203,7 @@ export const AdminHandoverPage = ({
               </div>
 
               {/* Physical Loket Receipt */}
-              <div className="rounded-md border-2 border-ug-950 bg-sheet shadow-[6px_6px_0_var(--color-ug-950)] overflow-hidden">
+              <div className="rounded-md border-2 border-ug-950 bg-sheet shadow-[4px_4px_0_var(--color-ug-950)] overflow-hidden">
                 <div className="bg-gold border-b-2 border-dashed border-ug-950 px-5 py-3.5 flex items-center justify-between gap-3">
                   <div>
                     <span className="font-bold text-ug-950 block text-sm tracking-tight">
@@ -522,7 +522,7 @@ export const AdminHandoverPage = ({
                       </p>
 
                       <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2.5">
-                        <label className="cursor-pointer inline-flex items-center justify-center gap-2 h-8 px-3 rounded-[5px] border-2 border-ink/80 bg-sheet text-ink hover:bg-ink hover:text-sheet text-xs font-bold transition-colors">
+                        <label className="cursor-pointer inline-flex items-center justify-center gap-2 h-8 px-3 rounded-[5px] border-[1.5px] border-ink/80 bg-sheet text-ink hover:bg-ink hover:text-sheet text-xs font-bold transition-colors">
                           <LuUpload className="size-4" aria-hidden="true" />
                           <span>Pilih Berkas Foto</span>
                           <input

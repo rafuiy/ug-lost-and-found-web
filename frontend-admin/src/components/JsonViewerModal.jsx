@@ -23,8 +23,8 @@ export const JsonViewerModal = ({ entry, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ug-950/65">
-      <div className="bg-sheet border-2 border-ink rounded-[5px] shadow-[6px_6px_0_var(--color-ink)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="on-ug px-6 py-4 bg-ug-800 text-sheet border-b-2 border-ug-950 flex items-center justify-between gap-4">
+      <div className="bg-sheet border-2 border-ink rounded-[5px] shadow-[4px_4px_0_var(--color-ink)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="on-ug px-6 py-4 bg-ug-950 text-sheet border-b border-ug-800 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <LuCode className="size-5 text-gold shrink-0" aria-hidden="true" />
             <div className="min-w-0">
@@ -34,7 +34,7 @@ export const JsonViewerModal = ({ entry, onClose }) => {
                   {entry.id}
                 </span>
               </h3>
-              <p className="text-xs text-sheet/75 tabular-nums mt-0.5 truncate">
+              <p className="text-xs text-ug-200/80 tabular-nums mt-0.5 truncate">
                 {entry.timestamp} · {entry.actorName} ({entry.actorId})
               </p>
             </div>
