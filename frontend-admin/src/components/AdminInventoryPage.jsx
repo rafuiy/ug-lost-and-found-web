@@ -21,6 +21,7 @@ export const AdminInventoryPage = ({
   onSelectToMatch,
   onCreateInventory,
   onUpdateInventory,
+  onDeleteInventory,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -260,7 +261,7 @@ export const AdminInventoryPage = ({
                       Tertaut: {linkedTicket}
                     </span>
                   ) : (
-                    <span className="text-ink-3 font-medium">Internal Only</span>
+                    <span />
                   )}
                   {isStored && (
                     <div className="flex items-center gap-2">
@@ -298,11 +299,13 @@ export const AdminInventoryPage = ({
         mode={drawerState.mode}
         initialItem={drawerState.item}
         nextId={nextInventoryId}
+        inventoryList={inventoryList}
         linkedReportTicket={
           drawerState.item ? linkedReportByInvId[drawerState.item.id] || null : null
         }
         onClose={handleCloseDrawer}
         onSubmit={handleDrawerSubmit}
+        onDelete={onDeleteInventory}
       />
     </div>
   );

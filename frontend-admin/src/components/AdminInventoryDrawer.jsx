@@ -24,6 +24,37 @@ const INVENTORY_CATEGORIES = [
 
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 
+const LOCKER_GROUPS = [
+  {
+    label: 'Blok A',
+    items: Array.from({ length: 10 }, (_, idx) => {
+      const code = `A-${String(idx + 1).padStart(2, '0')}`;
+      return { code, fullName: `Loker ${code} (Loket D)` };
+    }),
+  },
+  {
+    label: 'Blok B',
+    items: Array.from({ length: 10 }, (_, idx) => {
+      const code = `B-${String(idx + 1).padStart(2, '0')}`;
+      return { code, fullName: `Loker ${code} (Loket D)` };
+    }),
+  },
+  {
+    label: 'Blok C',
+    items: Array.from({ length: 5 }, (_, idx) => {
+      const code = `C-${String(idx + 1).padStart(2, '0')}`;
+      return { code, fullName: `Loker ${code} (Loket D)` };
+    }),
+  },
+  {
+    label: 'Safe',
+    items: Array.from({ length: 5 }, (_, idx) => {
+      const code = `Safe-${String(idx + 1).padStart(2, '0')}`;
+      return { code, fullName: `Loker ${code} (Loket D)` };
+    }),
+  },
+];
+
 function getCurrentLocalInputValue() {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -54,9 +85,11 @@ function InventoryDrawerContent({
   mode,
   initialItem,
   nextId,
+  inventoryList = [],
   linkedReportTicket,
   onClose,
   onSubmit,
+  onDelete,
 }) {
   const isEdit = mode === 'edit' && Boolean(initialItem);
   const itemId = isEdit ? initialItem.id : nextId;
@@ -86,8 +119,46 @@ function InventoryDrawerContent({
   );
   const [errors, setErrors] = useState({});
   const [photoError, setPhotoError] = useState('');
+  const [deletePrompt, setDeletePrompt] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const fieldRefs = useRef({});
+
+  const lockerItemCounts = inventoryList.reduce((acc, item) => {
+    if (item.status === 'Tersimpan' && item.storageLocker) {
+      acc[item.storageLocker] = (acc[item.storageLocker] || 0) + 1;
+    }
+    return acc;
+  }, {});
+
+  const selectedLockerCount = values.storageLocker
+    ? lockerItemCounts[values.storageLocker] || 0
+    : 0;
+
+  const handleSelectLocker = (fullName) => {
+    setValues((prev) => ({ ...prev, storageLocker: fullName }));
+    if (errors.storageLocker) {
+      setErrors((prev) => ({ ...prev, storageLocker: '' }));
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteReason.trim()) {
+      setDeleteError('Mohon cantumkan alasan penghapusan inventori.');
+      return;
+    }
+    if (deleteConfirmId !== itemId) {
+      setDeleteError(
+        `Konfirmasi ID inventori harus persis "${itemId}" (case-sensitive).`
+      );
+      return;
+    }
+    setDeleteError('');
+    onDelete?.(itemId, deleteReason.trim());
+    onClose();
+  };
 
   const updateField = (key) => (e) => {
     const nextVal = e.target.value;
@@ -263,68 +334,146 @@ function InventoryDrawerContent({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="inv-category" className={LABEL_CLASS}>
-                      Kategori <span className="text-danger">*</span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        ref={(el) => {
-                          fieldRefs.current.category = el;
-                        }}
-                        id="inv-category"
-                        value={values.category}
-                        onChange={updateField('category')}
-                        aria-invalid={errors.category ? true : undefined}
-                        className={`${INPUT_CLASS} h-11 appearance-none pr-9 font-semibold cursor-pointer ${
-                          errors.category ? 'border-danger' : ''
-                        }`}
-                      >
-                        {categoryOptions.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                      <LuChevronDown
-                        className="size-4 text-ink-3 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                        aria-hidden="true"
-                      />
+                <div>
+                  <label htmlFor="inv-category" className={LABEL_CLASS}>
+                    Kategori <span className="text-danger">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      ref={(el) => {
+                        fieldRefs.current.category = el;
+                      }}
+                      id="inv-category"
+                      value={values.category}
+                      onChange={updateField('category')}
+                      aria-invalid={errors.category ? true : undefined}
+                      className={`${INPUT_CLASS} h-11 appearance-none pr-9 font-semibold cursor-pointer ${
+                        errors.category ? 'border-danger' : ''
+                      }`}
+                    >
+                      {categoryOptions.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                    <LuChevronDown
+                      className="size-4 text-ink-3 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  {errors.category && (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger">
+                      <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                      <span>{errors.category}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                    <span className={LABEL_CLASS + ' mb-0'}>
+                      Loker Penyimpanan (30 Loker) <span className="text-danger">*</span>
+                    </span>
+                    <div className="flex items-center gap-3 text-[11px] text-ink-2">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-3.5 h-1.5 rounded-[3px] bg-ok shrink-0"
+                          aria-hidden="true"
+                        />
+                        Kosong
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-3.5 h-1.5 rounded-[3px] bg-danger shrink-0"
+                          aria-hidden="true"
+                        />
+                        Terisi (bertambah vertikal sesuai isi)
+                      </span>
                     </div>
-                    {errors.category && (
-                      <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger">
-                        <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
-                        <span>{errors.category}</span>
-                      </p>
-                    )}
                   </div>
 
-                  <div>
-                    <label htmlFor="inv-locker" className={LABEL_CLASS}>
-                      Loker Penyimpanan <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      ref={(el) => {
-                        fieldRefs.current.storageLocker = el;
-                      }}
-                      id="inv-locker"
-                      type="text"
-                      value={values.storageLocker}
-                      onChange={updateField('storageLocker')}
-                      placeholder="Contoh: Loker A-04 (Loket D)"
-                      aria-invalid={errors.storageLocker ? true : undefined}
-                      className={`${INPUT_CLASS} h-11 ${
-                        errors.storageLocker ? 'border-danger' : ''
-                      }`}
-                    />
-                    {errors.storageLocker && (
-                      <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger">
-                        <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
-                        <span>{errors.storageLocker}</span>
-                      </p>
-                    )}
+                  <div
+                    ref={(el) => {
+                      fieldRefs.current.storageLocker = el;
+                    }}
+                    tabIndex={-1}
+                    className={`rounded-[4px] border-[1.5px] bg-paper p-3 space-y-3 outline-none ${
+                      errors.storageLocker ? 'border-danger' : 'border-line-strong'
+                    }`}
+                  >
+                    {LOCKER_GROUPS.map((group) => (
+                      <div key={group.label} className="space-y-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3 block">
+                          {group.label}
+                        </span>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {group.items.map((locker) => {
+                            const count = lockerItemCounts[locker.fullName] || 0;
+                            const isSelected = values.storageLocker === locker.fullName;
+                            const visibleRedIcons = Math.min(count, 4);
+                            return (
+                              <button
+                                key={locker.code}
+                                type="button"
+                                onClick={() => handleSelectLocker(locker.fullName)}
+                                title={`${locker.fullName} — ${
+                                  count === 0 ? 'Kosong' : `${count} barang Tersimpan`
+                                }`}
+                                className={`px-2 py-2.5 rounded-[4px] border text-center transition-colors cursor-pointer flex flex-col items-center justify-between gap-2 min-h-[54px] ${
+                                  isSelected
+                                    ? 'border-ug-800 bg-ug-100 ring-1 ring-ug-700'
+                                    : 'border-line-strong bg-sheet hover:border-ink-2'
+                                }`}
+                              >
+                                <span className="text-[11px] font-bold text-ink tabular-nums leading-none">
+                                  {locker.code}
+                                </span>
+                                <span className="flex flex-col items-center justify-end gap-1">
+                                  {count === 0 ? (
+                                    <span
+                                      className="block w-4 h-1.5 rounded-[3px] bg-ok"
+                                      aria-label="Kosong"
+                                    />
+                                  ) : (
+                                    <>
+                                      {Array.from({ length: visibleRedIcons }).map((_, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="block w-4 h-1.5 rounded-[3px] bg-danger"
+                                          aria-hidden="true"
+                                        />
+                                      ))}
+                                      {count > 4 && (
+                                        <span className="text-[10px] font-bold text-danger leading-none">
+                                          +{count - 4}
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
+
+                  {values.storageLocker && (
+                    <p className="mt-1.5 text-xs text-ink-2">
+                      Terpilih: <strong className="text-ug-800">{values.storageLocker}</strong>
+                      {selectedLockerCount > 0 &&
+                        ` — sudah berisi ${selectedLockerCount} barang Tersimpan (tetap dapat ditambah jika slot penuh).`}
+                    </p>
+                  )}
+
+                  {errors.storageLocker && (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger">
+                      <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                      <span>{errors.storageLocker}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -543,6 +692,115 @@ function InventoryDrawerContent({
                 )}
               </div>
             </section>
+
+            {isEdit && onDelete && (
+              <section className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-b border-danger/30 pb-2">
+                  <h3 className="text-xs font-bold text-danger uppercase tracking-[0.08em] flex items-center gap-2">
+                    <LuTrash2 className="size-4" aria-hidden="true" />
+                    <span>Hapus Barang Inventori</span>
+                  </h3>
+                </div>
+
+                {!deletePrompt ? (
+                  <div className="rounded-[5px] border-[1.5px] border-danger/40 bg-danger-wash/60 p-4 flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-ink-2 leading-relaxed">
+                      Hapus item <strong className="tabular-nums">{itemId}</strong> secara
+                      permanen jika terjadi kesalahan input atau duplikasi data.
+                    </p>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setDeletePrompt(true)}
+                      className="shrink-0"
+                    >
+                      <LuTrash2 className="size-4" aria-hidden="true" />
+                      <span>Hapus Inventori</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-[5px] border-2 border-danger bg-danger-wash p-4 space-y-3">
+                    <p className="text-xs font-bold text-danger">
+                      Verifikasi Penghapusan Inventori ({itemId})
+                    </p>
+                    {linkedReportTicket && (
+                      <p className="text-xs text-ink-2 bg-sheet p-2.5 rounded-[4px] border border-danger/40">
+                        Perhatian: Barang ini sedang tertaut dengan tiket{' '}
+                        <strong className="tabular-nums">{linkedReportTicket}</strong>. Jika
+                        dihapus, tautan akan dilepas dan tiket berstatus Perlu Verifikasi akan
+                        dikembalikan ke <strong>Belum Ada</strong>.
+                      </p>
+                    )}
+
+                    <div>
+                      <label htmlFor="inv-delete-reason" className={LABEL_CLASS}>
+                        Alasan Penghapusan <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        id="inv-delete-reason"
+                        type="text"
+                        value={deleteReason}
+                        onChange={(e) => {
+                          setDeleteReason(e.target.value);
+                          if (deleteError) setDeleteError('');
+                        }}
+                        placeholder="Contoh: Salah input data barang / duplikasi entri"
+                        className={`${INPUT_CLASS} h-10`}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="inv-delete-confirm-id" className={LABEL_CLASS}>
+                        Ketik ID Inventori Lengkap (<span className="tabular-nums">{itemId}</span>){' '}
+                        — Case-Sensitive <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        id="inv-delete-confirm-id"
+                        type="text"
+                        value={deleteConfirmId}
+                        onChange={(e) => {
+                          setDeleteConfirmId(e.target.value);
+                          if (deleteError) setDeleteError('');
+                        }}
+                        placeholder={`Contoh: INV-085 (ketik ${itemId})`}
+                        className={`${INPUT_CLASS} h-10 font-mono tabular-nums`}
+                      />
+                    </div>
+
+                    {deleteError && (
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-danger">
+                        <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                        <span>{deleteError}</span>
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <Button
+                        variant="subtle"
+                        size="sm"
+                        onClick={() => {
+                          setDeletePrompt(false);
+                          setDeleteReason('');
+                          setDeleteConfirmId('');
+                          setDeleteError('');
+                        }}
+                      >
+                        Batal
+                      </Button>
+                      <Button
+                        variant="dangerSolid"
+                        size="sm"
+                        disabled={!deleteReason.trim() || deleteConfirmId !== itemId}
+                        onClick={handleConfirmDelete}
+                      >
+                        <LuTrash2 className="size-4" aria-hidden="true" />
+                        <span>Ya, Hapus Permanen</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
           </form>
 
           {/* Sticky Bottom Bar */}
@@ -571,9 +829,11 @@ export const AdminInventoryDrawer = ({
   mode = 'create',
   initialItem = null,
   nextId,
+  inventoryList = [],
   linkedReportTicket = null,
   onClose,
   onSubmit,
+  onDelete,
 }) => {
   if (!isOpen) return null;
 
@@ -583,9 +843,11 @@ export const AdminInventoryDrawer = ({
       mode={mode}
       initialItem={initialItem}
       nextId={nextId}
+      inventoryList={inventoryList}
       linkedReportTicket={linkedReportTicket}
       onClose={onClose}
       onSubmit={onSubmit}
+      onDelete={onDelete}
     />
   );
 };
