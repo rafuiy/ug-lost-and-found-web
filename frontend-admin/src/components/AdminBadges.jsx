@@ -5,6 +5,7 @@ const STATUS_STYLES = {
   'Perlu Verifikasi': 'bg-ug-100 border-ug-200 text-ug-800',
   Selesai: 'bg-ok-wash border-ok/30 text-ok',
   Ditolak: 'bg-danger-wash border-danger/30 text-danger',
+  Dibatalkan: 'bg-paper border-ink-3/40 text-ink-2',
   Tersimpan: 'bg-gold-wash border-gold-ink/35 text-gold-ink',
   Diambil: 'bg-ok-wash border-ok/30 text-ok',
 };
@@ -45,6 +46,8 @@ const AUDIT_COLORS = {
   INV_UPDATE: 'text-ug-800',
   STALE_RESTORE: 'text-ug-700',
   STATUS_REVERT: 'text-gold-ink',
+  HANDOVER_VOID: 'text-danger',
+  INV_DELETE: 'text-danger',
 };
 
 export const AuditBadge = ({ action }) => {

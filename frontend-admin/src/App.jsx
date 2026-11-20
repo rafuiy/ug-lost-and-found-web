@@ -296,6 +296,124 @@ export function App() {
     );
   };
 
+  const handleReopenRejectedReport = (reportCode, { reason }) => {
+    const target = reports.find((r) => r.ticketCode === reportCode);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+    const resubmitToken = `RST-${reportCode.replace(/[^A-Z0-9]/gi, '')}-${Date.now()
+      .toString(36)
+      .toUpperCase()}`;
+    const resubmitLink = `/lapor?reopen=${resubmitToken}`;
+
+    setReports((prev) =>
+      prev.map((r) =>
+        r.ticketCode === reportCode
+          ? {
+              ...r,
+              status: 'Dibatalkan',
+              cancelledFrom: 'Ditolak',
+              cancelReason: reason,
+              cancelledBy: officerLabel,
+              cancelEmailType: 'RESUBMIT_INVITATION',
+              resubmitLink,
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Status Ditolak dibatalkan menjadi Dibatalkan oleh ${officerLabel} (${reason}). Email tombol Ajukan Ulang dikirim ke ${r.reporterEmail}.`,
+            }
+          : r
+      )
+    );
+
+    appendAuditLog('STATUS_REVERT', `reports: ${reportCode}`, reportCode, {
+      action: 'CANCEL_REJECTED_REPORT',
+      ticket_code: reportCode,
+      previous_status: target?.status || 'Ditolak',
+      new_status: 'Dibatalkan',
+      reason,
+      email_type: 'RESUBMIT_INVITATION',
+      resubmit_link: resubmitLink,
+      officer: officerLabel,
+    });
+
+    addToast(
+      'success',
+      'Status Ditolak → Dibatalkan',
+      `Tiket ${reportCode} diubah menjadi Dibatalkan. Email khusus berisi tombol Ajukan Ulang telah dikirim ke ${target?.reporterEmail}.`
+    );
+  };
+
+  const handleVoidHandover = (
+    reportCode,
+    { reason, restoreInventory, includeResubmitLink }
+  ) => {
+    const target = reports.find((r) => r.ticketCode === reportCode);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+    const matchedInvId = target?.matchedInventoryId || '';
+    const resubmitLink = includeResubmitLink
+      ? `/lapor?reopen=VOID-${reportCode.replace(/[^A-Z0-9]/gi, '')}-${Date.now()
+          .toString(36)
+          .toUpperCase()}`
+      : null;
+
+    setReports((prev) =>
+      prev.map((r) =>
+        r.ticketCode === reportCode
+          ? {
+              ...r,
+              status: 'Dibatalkan',
+              cancelledFrom: 'Selesai',
+              cancelReason: reason,
+              cancelledBy: officerLabel,
+              cancelEmailType: 'ERROR_CLARIFICATION',
+              resubmitLink,
+              matchedInventoryId: '',
+              adminNotes: `${
+                r.adminNotes ? r.adminNotes + ' | ' : ''
+              }Status Selesai dibatalkan menjadi Dibatalkan oleh ${officerLabel} (${reason}). Email pemberitahuan kesalahan dikirim ke ${r.reporterEmail}.`,
+            }
+          : r
+      )
+    );
+
+    if (restoreInventory && matchedInvId) {
+      setInventoryList((prev) =>
+        prev.map((inv) =>
+          inv.id === matchedInvId
+            ? {
+                ...inv,
+                status: 'Tersimpan',
+                notes: `${inv.notes} [SERAH TERIMA DIBATALKAN: ${reason}]`,
+              }
+            : inv
+        )
+      );
+    }
+
+    appendAuditLog('HANDOVER_VOID', `reports: ${reportCode}`, reportCode, {
+      action: 'CANCEL_COMPLETED_REPORT',
+      ticket_code: reportCode,
+      previous_status: target?.status || 'Selesai',
+      new_status: 'Dibatalkan',
+      reason,
+      matched_inventory_id: matchedInvId || 'N/A',
+      inventory_restored_to_tersimpan: Boolean(restoreInventory && matchedInvId),
+      email_type: 'ERROR_CLARIFICATION',
+      resubmit_link: resubmitLink,
+      officer: officerLabel,
+    });
+
+    addToast(
+      'warning',
+      'Status Selesai → Dibatalkan',
+      `Tiket ${reportCode} diubah menjadi Dibatalkan${
+        restoreInventory && matchedInvId ? ' & inventori kembali Tersimpan' : ''
+      }. Email pemberitahuan kesalahan telah dikirim ke ${target?.reporterEmail}.`
+    );
+  };
+
   const handleSaveNotes = (reportCode, notes) => {
     setReports((prev) =>
       prev.map((r) => (r.ticketCode === reportCode ? { ...r, adminNotes: notes } : r))
@@ -441,6 +559,61 @@ export function App() {
     );
   };
 
+  const handleDeleteInventory = (inventoryId, reason) => {
+    const targetItem = inventoryList.find((inv) => inv.id === inventoryId);
+    const linkedReport = reports.find((r) => r.matchedInventoryId === inventoryId);
+    const officerLabel = `${currentOfficer?.name || 'Budi Santoso'} (${
+      currentOfficer?.id || 'ADM-04D'
+    })`;
+
+    setInventoryList((prev) => prev.filter((inv) => inv.id !== inventoryId));
+
+    if (linkedReport) {
+      setReports((prev) =>
+        prev.map((r) =>
+          r.matchedInventoryId === inventoryId
+            ? {
+                ...r,
+                matchedInventoryId: '',
+                status: r.status === 'Perlu Verifikasi' ? 'Belum Ada' : r.status,
+                adminNotes: `${
+                  r.adminNotes ? r.adminNotes + ' | ' : ''
+                }Inventori tertaut [${inventoryId}] dihapus oleh ${officerLabel} (${reason})${
+                  r.status === 'Perlu Verifikasi' ? ' — status dikembalikan ke Belum Ada.' : '.'
+                }`,
+              }
+            : r
+        )
+      );
+    }
+
+    appendAuditLog('INV_DELETE', `inventories: ${inventoryId}`, inventoryId, {
+      action: 'DELETE_FOUND_ITEM',
+      inventory_id: inventoryId,
+      item_title: targetItem?.title || 'N/A',
+      storage_location: targetItem?.storageLocker || 'N/A',
+      reason,
+      unlinked_ticket: linkedReport?.ticketCode || null,
+      reverted_ticket_to_belum_ada:
+        linkedReport?.status === 'Perlu Verifikasi' ? linkedReport.ticketCode : null,
+      deleted_by: officerLabel,
+    });
+
+    addToast(
+      'warning',
+      'Inventori Dihapus',
+      `Barang [${inventoryId}] berhasil dihapus dari inventori.${
+        linkedReport
+          ? ` Tautan tiket ${linkedReport.ticketCode} dilepas${
+              linkedReport.status === 'Perlu Verifikasi'
+                ? ' & dikembalikan ke Belum Ada'
+                : ''
+            }.`
+          : ''
+      }`
+    );
+  };
+
   const handleLoginSuccess = (officer) => {
     setCurrentOfficer(officer);
     setLoginNotice('');
@@ -479,6 +652,7 @@ export function App() {
     perluVerifikasi: reports.filter((r) => r.status === 'Perlu Verifikasi').length,
     lawas: reports.filter((r) => r.isStale).length,
     selesai: reports.filter((r) => r.status === 'Selesai').length,
+    dibatalkan: reports.filter((r) => r.status === 'Dibatalkan').length,
   };
 
   return (
@@ -535,6 +709,7 @@ export function App() {
             onSelectToMatch={handleSelectToMatchFromInventory}
             onCreateInventory={handleCreateInventory}
             onUpdateInventory={handleUpdateInventory}
+            onDeleteInventory={handleDeleteInventory}
           />
         )}
 
@@ -579,6 +754,8 @@ export function App() {
         }}
         onRestoreStaleReport={handleRestoreStaleReport}
         onRevertToUnmatched={handleRevertToUnmatched}
+        onReopenRejectedReport={handleReopenRejectedReport}
+        onVoidHandover={handleVoidHandover}
         onSaveNotes={handleSaveNotes}
         onOpenSecureFile={handleOpenSecureFile}
         onGoToHandover={handleGoToHandoverFromDrawer}
