@@ -419,7 +419,20 @@ function DrawerContent({
                   placeholder="Catatan internal petugas loket..."
                   className={`${INPUT_CLASS} min-h-20 py-2.5 leading-relaxed`}
                 />
-                <div className="flex justify-end mt-2.5">
+                <div className="flex items-center justify-end gap-2 mt-2.5">
+                  {report.status === 'Perlu Verifikasi' && onRevertToUnmatched && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setRevertPrompt(true);
+                        setRejectPrompt(false);
+                      }}
+                    >
+                      <LuRotateCcw className="size-4" aria-hidden="true" />
+                      <span>Kembalikan</span>
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={handleSaveNotes}>
                     <LuSave className="size-4" aria-hidden="true" />
                     <span>Simpan Catatan</span>
@@ -593,21 +606,6 @@ function DrawerContent({
                     : 'Terbitkan Undangan Loket'}
                 </span>
               </Button>
-
-              {report.status === 'Perlu Verifikasi' && onRevertToUnmatched && (
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => {
-                    setRevertPrompt(true);
-                    setRejectPrompt(false);
-                  }}
-                  className="shrink-0"
-                >
-                  <LuRotateCcw className="size-4" aria-hidden="true" />
-                  <span>Kembalikan</span>
-                </Button>
-              )}
 
               <Button
                 variant="danger"
