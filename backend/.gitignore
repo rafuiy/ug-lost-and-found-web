@@ -2,8 +2,10 @@
 .env.local
 .DS_Store
 *.log
+*.exe
 /bin
 /dist
+storage/
 .vscode
 .idea
 *.swp

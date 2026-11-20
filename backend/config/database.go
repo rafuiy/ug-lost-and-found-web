@@ -1,11 +1,11 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"log"
-	"os"
+	"strings"
+	"time"
 
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -13,44 +13,73 @@ import (
 
 var DB *gorm.DB
 
-func ConnectDB() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Warning: .env file not found, using default environment variables")
+// ConnectDB opens a PostgreSQL connection via GORM, configures pooling, and verifies connectivity.
+func ConnectDB(cfg *AppConfig) (*gorm.DB, error) {
+	if cfg == nil {
+		var err error
+		cfg, err = LoadConfig()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	host := os.Getenv("DB_HOST")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-	port := os.Getenv("DB_PORT")
-
-	if host == "" {
-		host = "localhost"
-	}
-	if user == "" {
-		user = "postgres"
-	}
-	if password == "" {
-		password = "postgres"
-	}
-	if dbname == "" {
-		dbname = "uglf_db"
-	}
-	if port == "" {
-		port = "5432"
-	}
-
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		host, user, password, dbname, port)
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
+		cfg.DBHost,
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBName,
+		cfg.DBPort,
+		cfg.DBSSLMode,
+		cfg.Timezone,
+	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(parseDBLogLevel(cfg.DBLogLevel)),
 	})
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
+	}
+
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(50)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	DB = db
 	fmt.Println("Database connected successfully")
+	return db, nil
+}
+
+// PingDB checks whether the global database connection is initialized and reachable.
+func PingDB() error {
+	if DB == nil {
+		return errors.New("database connection is not initialized")
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Ping()
+}
+
+func parseDBLogLevel(level string) logger.LogLevel {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "silent":
+		return logger.Silent
+	case "error":
+		return logger.Error
+	case "info":
+		return logger.Info
+	default:
+		return logger.Warn
+	}
 }
