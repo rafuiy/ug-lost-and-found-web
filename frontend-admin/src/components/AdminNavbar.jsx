@@ -17,6 +17,7 @@ export const AdminNavbar = ({
   onLogoutClick,
   queueCount = 0,
   officer = DEFAULT_OFFICER,
+  canViewAudit = true,
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -34,10 +35,14 @@ export const AdminNavbar = ({
       id: 'handover',
       label: 'Serah Terima',
     },
-    {
-      id: 'audit',
-      label: 'Audit Log',
-    },
+    ...(canViewAudit
+      ? [
+          {
+            id: 'audit',
+            label: 'Audit Log',
+          },
+        ]
+      : []),
   ];
 
   const handleSelect = (tab) => {
