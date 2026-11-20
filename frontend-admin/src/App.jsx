@@ -14,7 +14,8 @@ import { AdminInventoryPage } from './components/AdminInventoryPage';
 import { SecureFileModal } from './components/SecureFileModal';
 import { JsonViewerModal } from './components/JsonViewerModal';
 import { NotificationToast } from './components/NotificationToast';
-import { RiLogoutBoxRLine } from 'react-icons/ri';
+import { Button } from './components/ui/Button';
+import { LuLogOut } from 'react-icons/lu';
 
 const ADMIN_TAB_PATHS = {
   queue: '/antrean',
@@ -290,7 +291,14 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-700 flex flex-col font-sans">
+    <div className="min-h-svh bg-paper text-ink flex flex-col font-sans">
+      <a
+        href="#konten"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[4px] focus:bg-gold focus:px-4 focus:py-2 focus:font-bold focus:text-ug-950"
+      >
+        Lewati ke konten
+      </a>
+
       <AdminNavbar
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
@@ -298,21 +306,21 @@ export function App() {
         queueCount={statsCounts.belumAda}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
+      <main id="konten" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
         {activeTab === 'queue' && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-2 border-b border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b-2 border-ink">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                <h1 className="text-2xl font-bold text-ink tracking-[-0.03em]">
                   Antrean Laporan Mahasiswa
                 </h1>
-                <p className="text-sm text-slate-600 mt-1">
+                <p className="text-sm text-ink-2 mt-1">
                   Tinjau laporan masuk, cocokkan dengan inventori fisik, dan terbitkan undangan verifikasi loket.
                 </p>
               </div>
 
-              <span className="text-xs text-slate-500 font-mono bg-white px-3 py-1.5 rounded-xl border border-slate-200 shrink-0">
-                Shift Loket D • 08:00 - 16:00 WIB
+              <span className="text-xs font-semibold text-ink-2 bg-sheet px-3 py-1.5 rounded-[4px] border-[1.5px] border-line-strong tabular-nums shrink-0">
+                Shift Loket D · 08:00 - 16:00 WIB
               </span>
             </div>
 
@@ -340,6 +348,7 @@ export function App() {
 
         {activeTab === 'handover' && (
           <AdminHandoverPage
+            key={handoverPreloadTicket || 'default'}
             reports={reports}
             inventoryList={inventoryList}
             initialTicketCode={handoverPreloadTicket}
@@ -349,9 +358,22 @@ export function App() {
         )}
 
         {activeTab === 'audit' && (
-          <AdminAuditLogPage logs={auditLogs} onOpenJsonModal={(entry) => setActiveJsonLog(entry)} />
+          <AdminAuditLogPage
+            logs={auditLogs}
+            onOpenJsonModal={(entry) => setActiveJsonLog(entry)}
+          />
         )}
       </main>
+
+      <footer className="border-t-2 border-ink bg-paper mt-12">
+        <div className="max-w-7xl mx-auto flex flex-col gap-2 px-4 sm:px-6 py-6 text-[13px] text-ink-3 md:flex-row md:items-baseline md:gap-8">
+          <span className="font-bold text-ink">
+            UG Lost &amp; Found — Panel Petugas Loket
+          </span>
+          <p>Loket D Margonda · 08:00 - 16:00 WIB</p>
+          <p className="md:ml-auto">Layanan internal Universitas Gunadarma</p>
+        </div>
+      </footer>
 
       <AdminReviewDrawer
         report={selectedReport}
@@ -382,42 +404,40 @@ export function App() {
       <JsonViewerModal entry={activeJsonLog} onClose={() => setActiveJsonLog(null)} />
 
       {isLogoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                <RiLogoutBoxRLine className="w-5 h-5" />
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ug-950/65">
+          <div className="bg-sheet border-2 border-ink rounded-[5px] p-6 max-w-sm w-full shadow-[6px_6px_0_var(--color-ink)] space-y-4">
+            <div className="flex items-start gap-3">
+              <LuLogOut className="size-5 text-danger shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <h3 className="text-base font-bold text-slate-900">Konfirmasi Keluar</h3>
-                <p className="text-xs text-slate-500">
+                <h3 className="text-base font-bold text-ink">Konfirmasi Keluar</h3>
+                <p className="text-xs text-ink-3 mt-0.5">
                   Sesi Petugas Loket D (Budi Santoso)
                 </p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 bg-[#F8FAFC] p-3.5 rounded-xl border border-slate-200 leading-relaxed">
+            <p className="text-xs text-ink-2 bg-paper p-3.5 rounded-[4px] border border-line-strong leading-relaxed">
               Seluruh perubahan status dan log audit yang telah dieksekusi tersimpan aman.
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-line">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsLogoutModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-xl border border-slate-300 transition-colors"
               >
                 Batal
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ug"
+                size="sm"
                 onClick={() => {
                   setIsLogoutModalOpen(false);
                   addToast('info', 'Sesi Diakhiri', 'Logout berhasil dari Panel Petugas Loket.');
                 }}
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#3B1259] hover:bg-[#581C87] rounded-xl transition-colors"
               >
                 Keluar Sesi
-              </button>
+              </Button>
             </div>
           </div>
         </div>

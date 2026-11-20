@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { StatusBadge, StaleBadge, CategoryBadge } from './AdminBadges';
-import { RiSearchLine, RiFilter3Line, RiEyeLine, RiTimeLine } from 'react-icons/ri';
+import { Button } from './ui/Button';
+import { INPUT_CLASS } from './ui/styles';
+import { LuSearch, LuFilter, LuEye, LuClock } from 'react-icons/lu';
 
 export const AdminReportQueue = ({
   reports,
@@ -51,26 +53,29 @@ export const AdminReportQueue = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div className="rounded-[5px] border-2 border-ink bg-sheet shadow-[6px_6px_0_var(--color-ink)] overflow-hidden">
       {/* Toolbar */}
-      <div className="p-5 border-b border-slate-200 space-y-4">
+      <div className="p-4 sm:p-5 border-b-2 border-dotted border-line-strong bg-paper/50 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Left: Search & Category */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-xl">
             <div className="relative flex-1">
-              <RiSearchLine className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <LuSearch
+                className="size-4 text-ink-3 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari kode tiket, nama pelapor, atau NPM..."
-                className="w-full pl-10 pr-3 py-2 text-sm text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700 focus:border-purple-700"
+                className={`${INPUT_CLASS} h-10 pl-10 ${searchQuery ? 'pr-14' : ''}`}
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-medium"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-2 hover:text-ink cursor-pointer"
                 >
                   Clear
                 </button>
@@ -78,11 +83,12 @@ export const AdminReportQueue = ({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <RiFilter3Line className="w-4 h-4 text-slate-400" />
+              <LuFilter className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700"
+                aria-label="Filter kategori barang"
+                className={`${INPUT_CLASS} h-10 w-auto font-semibold`}
               >
                 <option value="ALL">Semua Kategori</option>
                 {categories
@@ -97,27 +103,30 @@ export const AdminReportQueue = ({
           </div>
 
           {/* Right: Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto text-xs shrink-0">
+          <div className="flex items-center gap-1 rounded-[4px] border-[1.5px] border-line-strong bg-paper p-1 overflow-x-auto text-xs shrink-0">
             {[
               { key: 'Semua', label: `Semua (${counts.all})` },
               { key: 'Belum Ada', label: `Belum Ada (${counts.belumAda})` },
               { key: 'Perlu Verifikasi', label: `Perlu Verifikasi (${counts.perluVerifikasi})` },
               { key: 'Lawas >30h', label: `Lawas >30h (${counts.lawas})` },
               { key: 'Selesai', label: `Selesai (${counts.selesai})` },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => onFilterTabChange(tab.key)}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                  activeFilterTab === tab.key
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ].map((tab) => {
+              const isActive = activeFilterTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => onFilterTabChange(tab.key)}
+                  className={`px-3 py-1.5 rounded-[3px] transition-colors whitespace-nowrap tabular-nums cursor-pointer ${
+                    isActive
+                      ? 'bg-ug-800 text-sheet font-bold'
+                      : 'text-ink-2 hover:text-ink font-semibold'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -126,7 +135,7 @@ export const AdminReportQueue = ({
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <tr className="bg-paper border-b-2 border-ink text-[11px] font-bold text-ink-2 uppercase tracking-[0.08em]">
               <th className="py-3.5 px-5 w-32">Kode Tiket</th>
               <th className="py-3.5 px-4 w-40">Tanggal Lapor</th>
               <th className="py-3.5 px-4">Pelapor</th>
@@ -136,66 +145,66 @@ export const AdminReportQueue = ({
               <th className="py-3.5 px-5 text-right w-36">Aksi</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 text-slate-700">
+          <tbody className="divide-y divide-line text-ink">
             {filteredReports.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-14 text-center text-slate-500">
-                  <RiTimeLine className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="font-medium text-slate-700 text-sm">
+                <td colSpan={7} className="py-14 text-center text-ink-3">
+                  <LuClock className="size-6 text-ink-3 mx-auto mb-2" aria-hidden="true" />
+                  <p className="font-bold text-ink text-sm">
                     Tidak ada pengaduan yang sesuai kriteria.
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-ink-3 mt-1">
                     Coba sesuaikan kata kunci pencarian atau tab filter.
                   </p>
                 </td>
               </tr>
             ) : (
               filteredReports.map((row) => (
-                <tr key={row.ticketCode} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="py-4 px-5 font-mono font-bold text-[#3B1259] whitespace-nowrap">
+                <tr key={row.ticketCode} className="hover:bg-ug-100/40 transition-colors">
+                  <td className="py-4 px-5 font-bold tabular-nums tracking-[0.02em] text-ug-800 whitespace-nowrap">
                     {row.ticketCode}
                   </td>
 
-                  <td className="py-4 px-4 font-mono text-xs text-slate-500 whitespace-nowrap">
+                  <td className="py-4 px-4 text-xs font-medium tabular-nums text-ink-2 whitespace-nowrap">
                     {row.reportedAt}
                   </td>
 
                   <td className="py-4 px-4">
-                    <div className="font-semibold text-slate-900">{row.reporterName}</div>
-                    <div className="font-mono text-xs text-slate-500 mt-0.5">
+                    <div className="font-bold text-ink">{row.reporterName}</div>
+                    <div className="text-xs font-medium tabular-nums text-ink-2 mt-0.5">
                       NPM {row.reporterNpm}
                     </div>
                   </td>
 
                   <td className="py-4 px-4">
-                    <div className="font-medium text-slate-900 line-clamp-1">{row.itemName}</div>
+                    <div className="font-semibold text-ink line-clamp-1">{row.itemName}</div>
                     <div className="mt-0.5">
                       <CategoryBadge category={row.category} />
                     </div>
                   </td>
 
-                  <td className="py-4 px-4 text-xs text-slate-600 max-w-xs">
+                  <td className="py-4 px-4 text-xs text-ink-2 max-w-xs">
                     <div className="line-clamp-2" title={row.lostLocation}>
                       {row.lostLocation}
                     </div>
                   </td>
 
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col items-start gap-2">
                       <StatusBadge status={row.status} />
                       {row.isStale && <StaleBadge />}
                     </div>
                   </td>
 
                   <td className="py-4 px-5 text-right whitespace-nowrap">
-                    <button
-                      type="button"
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => onReviewReport(row)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 transition-colors"
                     >
-                      <RiEyeLine className="w-3.5 h-3.5 text-[#3B1259]" />
-                      <span>Review Rincian</span>
-                    </button>
+                      <LuEye className="size-4" aria-hidden="true" />
+                      <span>Review</span>
+                    </Button>
                   </td>
                 </tr>
               ))
@@ -205,13 +214,13 @@ export const AdminReportQueue = ({
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="px-5 py-3 bg-paper border-t border-line-strong flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-ink-2 tabular-nums">
         <div>
-          Menampilkan <span className="font-semibold text-slate-800">{filteredReports.length}</span> dari{' '}
-          <span className="font-semibold text-slate-800">{reports.length}</span> laporan
+          Menampilkan <span className="font-bold text-ink">{filteredReports.length}</span> dari{' '}
+          <span className="font-bold text-ink">{reports.length}</span> laporan
         </div>
-        <div className="font-mono text-[11px]">
-          Loket D Margonda • Sync Realtime (WIB)
+        <div className="text-[11px] font-semibold text-ink-3">
+          Loket D Margonda · Sync Realtime (WIB)
         </div>
       </div>
     </div>

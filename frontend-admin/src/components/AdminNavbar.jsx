@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  RiLogoutBoxRLine,
-  RiArchiveLine,
-  RiFileList3Line,
-  RiCheckboxMultipleLine,
-  RiTimeLine,
-  RiMenuLine,
-  RiCloseLine,
-} from 'react-icons/ri';
+  LuLogOut,
+  LuArchive,
+  LuClipboardList,
+  LuClipboardCheck,
+  LuClock,
+  LuMenu,
+  LuX,
+} from 'react-icons/lu';
 
 export const AdminNavbar = ({
   activeTab,
@@ -18,10 +18,27 @@ export const AdminNavbar = ({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = [
-    { id: 'queue', label: 'Antrean Laporan', icon: <RiFileList3Line className="w-4 h-4" />, count: queueCount },
-    { id: 'inventory', label: 'Inventori Temuan', icon: <RiArchiveLine className="w-4 h-4" /> },
-    { id: 'handover', label: 'Serah Terima', icon: <RiCheckboxMultipleLine className="w-4 h-4" /> },
-    { id: 'audit', label: 'Audit Log', icon: <RiTimeLine className="w-4 h-4" /> },
+    {
+      id: 'queue',
+      label: 'Antrean Laporan',
+      icon: <LuClipboardList className="size-4 shrink-0" aria-hidden="true" />,
+      count: queueCount,
+    },
+    {
+      id: 'inventory',
+      label: 'Inventori Temuan',
+      icon: <LuArchive className="size-4 shrink-0" aria-hidden="true" />,
+    },
+    {
+      id: 'handover',
+      label: 'Serah Terima',
+      icon: <LuClipboardCheck className="size-4 shrink-0" aria-hidden="true" />,
+    },
+    {
+      id: 'audit',
+      label: 'Audit Log',
+      icon: <LuClock className="size-4 shrink-0" aria-hidden="true" />,
+    },
   ];
 
   const handleSelect = (tab) => {
@@ -30,30 +47,28 @@ export const AdminNavbar = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white border-b border-slate-200/80 select-none">
+    <header className="on-ug sticky top-0 z-40 w-full bg-ug-800 text-sheet border-b-2 border-ug-950 select-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14">
           {/* Brand + Nav */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6 lg:gap-8 h-full">
             <button
               type="button"
               onClick={() => handleSelect('queue')}
-              className="flex items-center gap-2.5 text-left focus:outline-none"
+              className="inline-flex items-center gap-2 rounded-[3px] text-left cursor-pointer"
             >
-              <div className="w-9 h-9 rounded-xl bg-[#3B1259] text-white flex items-center justify-center font-extrabold text-sm tracking-tight">
+              <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-[15px] font-bold text-ug-950">
                 UG
-              </div>
-              <div>
-                <span className="font-bold text-slate-900 text-base tracking-tight block leading-none">
-                  UG Lost &amp; Found
-                </span>
-                <span className="text-[11px] text-[#581C87] font-semibold block mt-0.5">
-                  Panel Petugas Loket
-                </span>
-              </div>
+              </span>
+              <span className="text-[15px] font-bold tracking-tight text-sheet">
+                Lost&nbsp;&amp;&nbsp;Found
+              </span>
+              <span className="hidden sm:inline-block border-l border-sheet/30 pl-2.5 text-xs font-semibold text-sheet/75">
+                Panel Loket
+              </span>
             </button>
 
-            <nav className="hidden md:flex items-center gap-1" aria-label="Menu Admin">
+            <nav className="hidden md:flex items-stretch h-full gap-1" aria-label="Menu Admin">
               {navItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
@@ -61,17 +76,18 @@ export const AdminNavbar = ({
                     key={item.id}
                     type="button"
                     onClick={() => handleSelect(item.id)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`inline-flex items-center gap-2 px-3 text-sm transition-colors cursor-pointer border-b-2 ${
                       isActive
-                        ? 'bg-[#F3EEF8] text-[#3B1259] font-semibold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'border-gold text-gold font-bold'
+                        : 'border-transparent text-sheet/80 hover:text-sheet font-semibold'
                     }`}
                   >
                     {item.icon}
                     <span>{item.label}</span>
                     {typeof item.count === 'number' && item.count > 0 && (
-                      <span className="font-mono text-xs font-bold text-[#581C87]">
-                        ({item.count})
+                      <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-[11px] font-bold text-ug-950 tabular-nums leading-none">
+                        {item.count}
                       </span>
                     )}
                   </button>
@@ -82,16 +98,13 @@ export const AdminNavbar = ({
 
           {/* Right Section: Petugas Profile & Logout */}
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2.5 pr-3 border-r border-slate-200">
-              <div className="w-8 h-8 rounded-full bg-[#F3EEF8] text-[#3B1259] flex items-center justify-center font-bold text-xs">
-                BS
-              </div>
-              <div className="text-left">
-                <div className="text-xs font-semibold text-slate-900 leading-tight">
+            <div className="hidden sm:flex items-center gap-2.5 pr-3 border-r border-sheet/25">
+              <div className="text-right">
+                <div className="text-xs font-bold text-sheet leading-tight">
                   Budi Santoso
                 </div>
-                <div className="text-[11px] text-slate-500 font-mono">
-                  Loket D • ADM-04D
+                <div className="text-[11px] font-medium text-sheet/75 tabular-nums">
+                  Loket D · ADM-04D
                 </div>
               </div>
             </div>
@@ -99,19 +112,23 @@ export const AdminNavbar = ({
             <button
               type="button"
               onClick={onLogoutClick}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-[5px] border-[1.5px] border-sheet/60 px-3 py-1.5 text-xs font-bold text-sheet hover:border-gold hover:text-gold transition-colors cursor-pointer"
             >
-              <RiLogoutBoxRLine className="w-3.5 h-3.5" />
+              <LuLogOut className="size-4" aria-hidden="true" />
               <span>Logout</span>
             </button>
 
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+              className="md:hidden p-2 rounded-[4px] text-sheet/80 hover:text-gold hover:bg-ug-900 cursor-pointer"
               aria-label={mobileOpen ? 'Tutup menu' : 'Buka menu'}
             >
-              {mobileOpen ? <RiCloseLine className="w-5 h-5" /> : <RiMenuLine className="w-5 h-5" />}
+              {mobileOpen ? (
+                <LuX className="size-5" aria-hidden="true" />
+              ) : (
+                <LuMenu className="size-5" aria-hidden="true" />
+              )}
             </button>
           </div>
         </div>
@@ -119,7 +136,7 @@ export const AdminNavbar = ({
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="md:hidden bg-white border-t border-slate-200 px-4 py-3 space-y-1.5">
+        <div className="md:hidden bg-ug-900 border-t border-sheet/15 px-4 py-3 space-y-1 text-sheet">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -127,8 +144,10 @@ export const AdminNavbar = ({
                 key={item.id}
                 type="button"
                 onClick={() => handleSelect(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium ${
-                  isActive ? 'bg-[#F3EEF8] text-[#3B1259] font-semibold' : 'text-slate-700'
+                className={`w-full flex items-center justify-between py-2.5 pr-3 text-sm transition-colors cursor-pointer border-l-2 ${
+                  isActive
+                    ? 'border-gold pl-2.5 text-gold font-bold'
+                    : 'border-transparent pl-3 text-sheet/85 hover:text-sheet font-medium'
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -136,22 +155,26 @@ export const AdminNavbar = ({
                   {item.label}
                 </span>
                 {typeof item.count === 'number' && item.count > 0 && (
-                  <span className="font-mono text-xs font-bold text-[#581C87]">{item.count}</span>
+                  <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-[11px] font-bold text-ug-950 tabular-nums leading-none">
+                    {item.count}
+                  </span>
                 )}
               </button>
             );
           })}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between px-3 py-1">
-            <span className="text-xs text-slate-500 font-mono">Budi Santoso (ADM-04D)</span>
+          <div className="pt-2.5 mt-2 border-t border-sheet/15 flex items-center justify-between px-3 py-1">
+            <span className="text-xs text-sheet/75 tabular-nums">
+              Budi Santoso (ADM-04D)
+            </span>
             <button
               type="button"
               onClick={() => {
                 setMobileOpen(false);
                 onLogoutClick();
               }}
-              className="text-xs font-semibold text-rose-700 flex items-center gap-1"
+              className="text-xs font-bold text-gold hover:underline flex items-center gap-1.5 cursor-pointer"
             >
-              <RiLogoutBoxRLine className="w-3.5 h-3.5" />
+              <LuLogOut className="size-4" aria-hidden="true" />
               Logout
             </button>
           </div>

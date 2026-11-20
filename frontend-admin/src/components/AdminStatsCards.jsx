@@ -1,89 +1,113 @@
-import React from 'react';
-import {
-  RiInboxArchiveLine,
-  RiAlertLine,
-  RiCheckboxCircleLine,
-  RiArrowRightLine,
-  RiTimeLine,
-} from 'react-icons/ri';
+import { LuArrowRight } from 'react-icons/lu';
 
 export const AdminStatsCards = ({ activeFilter, onFilterSelect, counts }) => {
-  const cards = [
-    {
-      key: 'Belum Ada',
-      title: 'Antrean Baru',
-      value: counts.belumAda,
-      subtitle: 'Menunggu pencocokan',
-      icon: <RiInboxArchiveLine className="w-5 h-5" />,
-      iconBg: 'bg-purple-100 text-[#3B1259]',
-      valueColor: 'text-slate-900',
-      activeRing: 'border-[#3B1259] ring-1 ring-[#3B1259]',
-    },
+  const isQueueActive = activeFilter === 'Belum Ada';
+
+  const ledgerCells = [
     {
       key: 'Perlu Verifikasi',
       title: 'Perlu Verifikasi',
       value: counts.perluVerifikasi,
       subtitle: 'Diundang ke loket',
-      icon: <RiAlertLine className="w-5 h-5" />,
-      iconBg: 'bg-amber-100 text-amber-800',
-      valueColor: 'text-amber-700',
-      activeRing: 'border-amber-600 ring-1 ring-amber-600',
+      valueColor: 'text-ug-700',
+      activeBg: 'bg-ug-100',
     },
     {
       key: 'Lawas >30h',
-      title: 'Laporan Lawas (>30h)',
+      title: 'Lawas (>30h)',
       value: counts.lawas,
       subtitle: 'Perlu tinjauan ulang',
-      icon: <RiTimeLine className="w-5 h-5" />,
-      iconBg: 'bg-orange-100 text-orange-800',
-      valueColor: 'text-orange-700',
-      activeRing: 'border-orange-600 ring-1 ring-orange-600',
+      valueColor: 'text-gold-ink',
+      activeBg: 'bg-gold-wash',
     },
     {
       key: 'Selesai',
       title: 'Selesai Diserahkan',
       value: counts.selesai,
       subtitle: 'Handover terverifikasi',
-      icon: <RiCheckboxCircleLine className="w-5 h-5" />,
-      iconBg: 'bg-emerald-100 text-emerald-800',
-      valueColor: 'text-emerald-700',
-      activeRing: 'border-emerald-600 ring-1 ring-emerald-600',
+      valueColor: 'text-ok',
+      activeBg: 'bg-ok-wash',
     },
   ];
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((card) => {
-        const isActive = activeFilter === card.key;
-        return (
-          <button
-            key={card.key}
-            type="button"
-            onClick={() => onFilterSelect && onFilterSelect(isActive ? 'Semua' : card.key)}
-            className={`text-left bg-white border rounded-2xl p-5 shadow-sm transition-colors flex flex-col justify-between ${
-              isActive ? card.activeRing : 'border-slate-200 hover:border-purple-300'
-            }`}
-          >
-            <div className="flex items-start justify-between w-full">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${card.iconBg}`}>
-                {card.icon}
-              </div>
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400">
-                <span>Filter</span>
-                <RiArrowRightLine className="w-3 h-3" />
-              </span>
-            </div>
+  const handleToggle = (key) => {
+    if (!onFilterSelect) return;
+    onFilterSelect(activeFilter === key ? 'Semua' : key);
+  };
 
-            <div className="mt-4">
-              <div className={`text-3xl font-bold font-mono tracking-tight ${card.valueColor}`}>
-                {card.value}
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_2fr]">
+      {/* Left Zone: Primary Actionable Queue */}
+      <button
+        type="button"
+        onClick={() => handleToggle('Belum Ada')}
+        aria-pressed={isQueueActive}
+        className={`rounded-[5px] border-2 p-5 text-left flex flex-col justify-between transition-colors cursor-pointer ${
+          isQueueActive
+            ? 'border-ug-800 bg-ug-100 shadow-[4px_4px_0_var(--color-ug-800)]'
+            : 'border-ink bg-sheet shadow-[4px_4px_0_var(--color-ink)] hover:bg-ug-100/60'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2 w-full">
+          <span className="text-xs font-bold uppercase tracking-[0.08em] text-ug-700">
+            Antrean Baru
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-ink-2">
+            <span>{isQueueActive ? 'Filter aktif' : 'Tampilkan'}</span>
+            <LuArrowRight className="size-4" aria-hidden="true" />
+          </span>
+        </div>
+
+        <div className="mt-4 flex items-baseline justify-between gap-4">
+          <span className="text-4xl font-bold tabular-nums tracking-[-0.03em] text-ink">
+            {counts.belumAda}
+          </span>
+          <span className="text-xs font-medium text-ink-2 text-right">
+            Menunggu pencocokan dengan inventori fisik
+          </span>
+        </div>
+      </button>
+
+      {/* Right Zone: Unified 3-Column Counter Ledger */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 rounded-[5px] border-2 border-ink bg-sheet divide-y sm:divide-y-0 sm:divide-x divide-line-strong overflow-hidden">
+        {ledgerCells.map((cell) => {
+          const isActive = activeFilter === cell.key;
+          return (
+            <button
+              key={cell.key}
+              type="button"
+              onClick={() => handleToggle(cell.key)}
+              aria-pressed={isActive}
+              className={`p-4 sm:p-5 text-left flex flex-col justify-between transition-colors cursor-pointer ${
+                isActive ? cell.activeBg : 'bg-sheet hover:bg-paper'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 w-full">
+                <span className="text-xs font-bold text-ink">{cell.title}</span>
+                {isActive ? (
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ug-800">
+                    Aktif
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-3">
+                    <span>Filter</span>
+                    <LuArrowRight className="size-4" aria-hidden="true" />
+                  </span>
+                )}
               </div>
-              <div className="text-sm font-semibold text-slate-900 mt-1">{card.title}</div>
-              <div className="text-xs text-slate-500 mt-0.5">{card.subtitle}</div>
-            </div>
-          </button>
-        );
-      })}
+
+              <div className="mt-3">
+                <div
+                  className={`text-3xl font-bold tabular-nums tracking-[-0.03em] ${cell.valueColor}`}
+                >
+                  {cell.value}
+                </div>
+                <div className="text-xs text-ink-3 mt-1">{cell.subtitle}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

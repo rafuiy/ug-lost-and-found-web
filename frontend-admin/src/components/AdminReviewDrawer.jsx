@@ -1,24 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { StatusBadge, StaleBadge } from './AdminBadges';
+import { useState } from 'react';
+import { StatusStamp } from './ui/Stamp';
+import { Button } from './ui/Button';
+import { INPUT_CLASS, LABEL_CLASS } from './ui/styles';
 import {
-  RiCloseLine,
-  RiLockLine,
-  RiWhatsappLine,
-  RiMapPinLine,
-  RiCalendarLine,
-  RiUserLine,
-  RiMailLine,
-  RiPhoneLine,
-  RiArchiveLine,
-  RiCheckboxCircleLine,
-  RiSendPlaneLine,
-  RiSaveLine,
-  RiEyeLine,
-} from 'react-icons/ri';
+  LuX,
+  LuLock,
+  LuMessageCircle,
+  LuMapPin,
+  LuCalendar,
+  LuUser,
+  LuMail,
+  LuPhone,
+  LuArchive,
+  LuCircleCheck,
+  LuCircleAlert,
+  LuSend,
+  LuSave,
+  LuEye,
+  LuClock,
+} from 'react-icons/lu';
 
-export const AdminReviewDrawer = ({
+function formatPhoneForWa(phone) {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    return '62' + cleaned.slice(1);
+  }
+  return cleaned;
+}
+
+function DrawerContent({
   report,
-  isOpen,
   onClose,
   inventoryList,
   onIssueInvitation,
@@ -26,24 +37,15 @@ export const AdminReviewDrawer = ({
   onSaveNotes,
   onOpenSecureFile,
   onGoToHandover,
-}) => {
-  const [selectedInventoryId, setSelectedInventoryId] = useState('');
-  const [adminNotes, setAdminNotes] = useState('');
+}) {
+  const [selectedInventoryId, setSelectedInventoryId] = useState(
+    report.matchedInventoryId || ''
+  );
+  const [adminNotes, setAdminNotes] = useState(report.adminNotes || '');
   const [notesSaved, setNotesSaved] = useState(false);
   const [rejectPrompt, setRejectPrompt] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-
-  useEffect(() => {
-    if (report) {
-      setSelectedInventoryId(report.matchedInventoryId || '');
-      setAdminNotes(report.adminNotes || '');
-      setNotesSaved(false);
-      setRejectPrompt(false);
-      setRejectReason('');
-    }
-  }, [report]);
-
-  if (!isOpen || !report) return null;
+  const [rejectError, setRejectError] = useState('');
 
   const availableInventory = inventoryList.filter(
     (item) => item.status === 'Tersimpan' || item.id === report.matchedInventoryId
@@ -63,55 +65,51 @@ export const AdminReviewDrawer = ({
 
   const handleExecuteReject = () => {
     if (!rejectReason.trim()) {
-      alert('Mohon cantumkan alasan penolakan laporan.');
+      setRejectError('Mohon cantumkan alasan penolakan laporan.');
       return;
     }
+    setRejectError('');
     onRejectReport(report.ticketCode, rejectReason);
     setRejectPrompt(false);
   };
 
-  const formatPhoneForWa = (phone) => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.startsWith('0')) {
-      return '62' + cleaned.slice(1);
-    }
-    return cleaned;
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-slate-900/40 transition-opacity" onClick={onClose} />
+      <div className="absolute inset-0 bg-ug-950/55 transition-opacity" onClick={onClose} />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-8 sm:pl-10">
+        <div className="w-screen max-w-2xl bg-paper border-l-2 border-ink flex flex-col h-full">
           {/* Header */}
-          <div className="px-6 py-5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#3B1259] text-white flex items-center justify-center font-bold text-xs">
-                UG
+          <div className="on-ug px-6 py-5 bg-ug-800 text-sheet border-b-2 border-ug-950 flex items-start justify-between gap-4 shrink-0">
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="rounded-[3px] bg-gold px-2 py-0.5 text-xs font-bold text-ug-950 tabular-nums">
+                  {report.ticketCode}
+                </span>
+                <h2 className="text-base font-bold text-sheet tracking-tight">
+                  Review Pengaduan
+                </h2>
+                <StatusStamp status={report.status} size="sm" className="bg-sheet" />
+                {report.isStale && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-gold">
+                    <LuClock className="size-4" aria-hidden="true" />
+                    Lawas &gt;30h
+                  </span>
+                )}
               </div>
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-base font-bold text-slate-900">
-                    Review Pengaduan:{' '}
-                    <span className="font-mono text-[#3B1259]">{report.ticketCode}</span>
-                  </h2>
-                  <StatusBadge status={report.status} />
-                  {report.isStale && <StaleBadge />}
-                </div>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
-                  Diajukan {report.reportedAt} WIB
-                </p>
-              </div>
+              <p className="text-xs text-sheet/75 tabular-nums mt-1.5">
+                Diajukan {report.reportedAt} WIB
+              </p>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-2 text-sheet/80 hover:text-gold hover:bg-ug-900 rounded-[4px] transition-colors cursor-pointer shrink-0"
+              aria-label="Tutup panel"
               title="Tutup"
             >
-              <RiCloseLine className="w-5 h-5" />
+              <LuX className="size-5" aria-hidden="true" />
             </button>
           </div>
 
@@ -119,38 +117,40 @@ export const AdminReviewDrawer = ({
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* Section 1: Data Laporan Mahasiswa */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <RiUserLine className="w-4 h-4 text-[#581C87]" />
+              <div className="flex items-center justify-between border-b border-line-strong pb-2">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-[0.08em] flex items-center gap-2">
+                  <LuUser className="size-4 text-ug-700" aria-hidden="true" />
                   Data Laporan Mahasiswa
                 </h3>
-                <span className="text-xs text-slate-400 font-mono">{report.ticketCode}</span>
+                <span className="text-xs font-bold text-ink-3 tabular-nums">
+                  {report.ticketCode}
+                </span>
               </div>
 
-              <div className="bg-[#F8FAFC] border border-slate-200 rounded-xl p-4 sm:p-5 space-y-4">
+              <div className="rounded-[5px] border-[1.5px] border-line-strong bg-sheet p-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-xs text-slate-500 block">Nama Lengkap</span>
-                    <span className="font-semibold text-slate-900">{report.reporterName}</span>
+                    <span className="text-xs font-medium text-ink-3 block">Nama Lengkap</span>
+                    <span className="font-bold text-ink">{report.reporterName}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block">NPM</span>
-                    <span className="font-mono font-semibold text-[#3B1259]">
+                    <span className="text-xs font-medium text-ink-3 block">NPM</span>
+                    <span className="font-bold text-ug-800 tabular-nums">
                       {report.reporterNpm}
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block">Email Institusi</span>
-                    <span className="text-slate-800 font-mono text-xs flex items-center gap-1.5 mt-0.5">
-                      <RiMailLine className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-ink-3 block">Email Institusi</span>
+                    <span className="text-ink font-medium text-xs flex items-center gap-1.5 mt-0.5 break-all">
+                      <LuMail className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
                       {report.reporterEmail}
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block">WhatsApp</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-slate-800 font-mono text-xs flex items-center gap-1.5">
-                        <RiPhoneLine className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-ink-3 block">WhatsApp</span>
+                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                      <span className="text-ink font-semibold text-xs tabular-nums flex items-center gap-1.5">
+                        <LuPhone className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
                         {report.reporterPhone}
                       </span>
                       <a
@@ -161,71 +161,73 @@ export const AdminReviewDrawer = ({
                         }`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-bold bg-ok hover:bg-ok/90 text-sheet transition-colors"
                       >
-                        <RiWhatsappLine className="w-3 h-3" />
+                        <LuMessageCircle className="size-4" aria-hidden="true" />
                         WhatsApp
                       </a>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="pt-4 border-t-2 border-dotted border-line-strong grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-xs text-slate-500 flex items-center gap-1">
-                      <RiMapPinLine className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-ink-3 flex items-center gap-1.5">
+                      <LuMapPin className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
                       Lokasi Hilang
                     </span>
-                    <span className="text-slate-800 font-medium text-xs mt-0.5 block">
+                    <span className="text-ink font-semibold text-xs mt-1 block">
                       {report.lostLocation}
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 flex items-center gap-1">
-                      <RiCalendarLine className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-ink-3 flex items-center gap-1.5">
+                      <LuCalendar className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
                       Waktu Hilang
                     </span>
-                    <span className="text-slate-800 font-mono text-xs mt-0.5 block">
+                    <span className="text-ink font-semibold text-xs tabular-nums mt-1 block">
                       {report.lostDate}
                     </span>
                   </div>
                 </div>
 
-                <div>
-                  <span className="text-xs text-slate-500 block mb-1.5">Deskripsi Barang</span>
-                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-slate-800 text-sm leading-relaxed">
-                    <span className="font-semibold text-slate-900 block mb-1">
+                <div className="pt-2 border-t-2 border-dotted border-line-strong">
+                  <span className="text-xs font-medium text-ink-3 block mb-1.5">
+                    Deskripsi Barang
+                  </span>
+                  <div className="bg-paper p-3.5 rounded-[4px] border border-line-strong text-ink text-sm leading-relaxed">
+                    <span className="font-bold text-ink block mb-1">
                       {report.itemName}{' '}
-                      <span className="text-xs font-normal text-slate-500">({report.category})</span>
+                      <span className="text-xs font-medium text-ink-3">({report.category})</span>
                     </span>
-                    <span className="text-xs text-slate-600">{report.description}</span>
+                    <span className="text-xs text-ink-2">{report.description}</span>
                   </div>
                 </div>
               </div>
 
               {/* Ciri Khusus Rahasia */}
-              <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-amber-900 font-bold text-xs uppercase tracking-wide">
+              <div className="rounded-[5px] border-[1.5px] border-ug-200 bg-ug-100 p-4 space-y-2">
+                <div className="flex items-center justify-between text-ug-800 font-bold text-xs uppercase tracking-[0.06em]">
                   <span className="flex items-center gap-2">
-                    <RiLockLine className="w-4 h-4 text-amber-700" />
+                    <LuLock className="size-4 text-ug-700" aria-hidden="true" />
                     Ciri Khusus Rahasia Pelapor
                   </span>
-                  <span className="font-normal text-amber-800">Internal Only</span>
+                  <span className="font-semibold text-ug-700">Internal Only</span>
                 </div>
-                <p className="text-sm text-amber-950 font-medium leading-relaxed bg-white/70 p-3 rounded-lg border border-amber-200">
-                  "{report.secretFeature}"
+                <p className="text-sm text-ink font-medium leading-relaxed bg-sheet p-3 rounded-[4px] border border-ug-200">
+                  &ldquo;{report.secretFeature}&rdquo;
                 </p>
               </div>
 
               {/* Preview Dokumen */}
               <div>
-                <span className="text-xs font-bold text-slate-700 block mb-2.5 uppercase tracking-wider">
+                <span className="text-xs font-bold text-ink block mb-2.5 uppercase tracking-[0.08em]">
                   Preview Dokumen
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
+                  <div className="bg-sheet border-[1.5px] border-line-strong rounded-[4px] p-3 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                      <div className="w-11 h-11 bg-paper rounded-[3px] border border-line-strong overflow-hidden shrink-0">
                         <img
                           src={report.ktmThumbnailUrl}
                           alt="KTM"
@@ -233,14 +235,15 @@ export const AdminReviewDrawer = ({
                         />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-900">Foto KTM</div>
-                        <div className="text-[11px] text-slate-500 font-mono truncate">
+                        <div className="text-xs font-bold text-ink">Foto KTM</div>
+                        <div className="text-[11px] text-ink-3 truncate">
                           {report.ktmFileName || 'Tervalidasi'}
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
+                    <Button
+                      variant="subtle"
+                      size="sm"
                       onClick={() =>
                         onOpenSecureFile(
                           `KTM Pelapor - ${report.reporterName}`,
@@ -248,16 +251,16 @@ export const AdminReviewDrawer = ({
                           'ktm'
                         )
                       }
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg border border-slate-300 transition-colors flex items-center gap-1 shrink-0"
+                      className="shrink-0"
                     >
-                      <RiEyeLine className="w-3.5 h-3.5" />
-                      Buka
-                    </button>
+                      <LuEye className="size-4" aria-hidden="true" />
+                      <span>Buka</span>
+                    </Button>
                   </div>
 
-                  <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
+                  <div className="bg-sheet border-[1.5px] border-line-strong rounded-[4px] p-3 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="w-11 h-11 bg-paper rounded-[3px] border border-line-strong overflow-hidden shrink-0 flex items-center justify-center">
                         {report.itemThumbnailUrl ? (
                           <img
                             src={report.itemThumbnailUrl}
@@ -265,12 +268,12 @@ export const AdminReviewDrawer = ({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <RiArchiveLine className="w-5 h-5 text-slate-400" />
+                          <LuArchive className="size-5 text-ink-3" aria-hidden="true" />
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-900">Foto Barang</div>
-                        <div className="text-[11px] text-slate-500 truncate">
+                        <div className="text-xs font-bold text-ink">Foto Barang</div>
+                        <div className="text-[11px] text-ink-3 truncate">
                           {report.itemThumbnailUrl
                             ? report.supportFileName || 'Tersedia'
                             : 'Tidak diunggah'}
@@ -278,8 +281,9 @@ export const AdminReviewDrawer = ({
                       </div>
                     </div>
                     {report.itemThumbnailUrl && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="subtle"
+                        size="sm"
                         onClick={() =>
                           onOpenSecureFile(
                             `Foto Barang - ${report.itemName}`,
@@ -287,11 +291,11 @@ export const AdminReviewDrawer = ({
                             'item'
                           )
                         }
-                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg border border-slate-300 transition-colors flex items-center gap-1 shrink-0"
+                        className="shrink-0"
                       >
-                        <RiEyeLine className="w-3.5 h-3.5" />
-                        Buka
-                      </button>
+                        <LuEye className="size-4" aria-hidden="true" />
+                        <span>Buka</span>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -299,25 +303,26 @@ export const AdminReviewDrawer = ({
             </div>
 
             {/* Section 2: Pencocokan Inventori */}
-            <div className="pt-4 border-t border-slate-200 space-y-4">
+            <div className="pt-5 border-t-2 border-dotted border-line-strong space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <RiArchiveLine className="w-4 h-4 text-[#581C87]" />
+                <h3 className="text-xs font-bold text-ink uppercase tracking-[0.08em] flex items-center gap-2">
+                  <LuArchive className="size-4 text-ug-700" aria-hidden="true" />
                   Pencocokan Inventori Fisik
                 </h3>
-                <span className="text-xs text-slate-500 font-mono">
+                <span className="text-xs font-bold text-ink-3 tabular-nums">
                   {availableInventory.length} Tersimpan
                 </span>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                  Pilih Barang Temuan Fisik dari Inventori:
+                <label htmlFor="drawer-inventory-select" className={LABEL_CLASS}>
+                  Pilih Barang Temuan Fisik dari Inventori
                 </label>
                 <select
+                  id="drawer-inventory-select"
                   value={selectedInventoryId}
                   onChange={(e) => setSelectedInventoryId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm font-medium text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700 font-mono"
+                  className={`${INPUT_CLASS} h-11 font-semibold tabular-nums`}
                 >
                   <option value="">-- Belum Dipilih / Tidak Ada Temuan Cocok --</option>
                   {availableInventory.map((item) => (
@@ -329,35 +334,35 @@ export const AdminReviewDrawer = ({
               </div>
 
               {matchedInventory ? (
-                <div className="bg-[#F3EEF8] border border-purple-200 rounded-xl p-4 space-y-3">
+                <div className="bg-sheet border-2 border-ug-700 rounded-[5px] p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="font-mono font-bold text-xs text-[#3B1259]">
+                      <span className="font-bold text-xs text-ug-700 tabular-nums">
                         [{matchedInventory.id}]
                       </span>
-                      <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                      <h4 className="text-sm font-bold text-ink mt-0.5">
                         {matchedInventory.title}
                       </h4>
                     </div>
-                    <span className="text-xs font-mono text-[#3B1259] font-semibold">
+                    <span className="bg-ug-100 text-ug-800 px-2 py-0.5 rounded-[3px] text-xs font-bold tabular-nums shrink-0">
                       {matchedInventory.storageLocker}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-700 bg-white p-3 rounded-lg border border-purple-200">
+                  <p className="text-xs text-ink-2 bg-paper p-3 rounded-[4px] border border-line-strong">
                     {matchedInventory.notes}
                   </p>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-emerald-700 font-medium flex items-center gap-1.5">
-                      <RiCheckboxCircleLine className="w-4 h-4" />
+                  <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                    <span className="text-ok font-bold flex items-center gap-1.5">
+                      <LuCircleCheck className="size-4" aria-hidden="true" />
                       Barang siap dicocokkan
                     </span>
                     {report.status === 'Perlu Verifikasi' && onGoToHandover && (
                       <button
                         type="button"
                         onClick={() => onGoToHandover(report.ticketCode)}
-                        className="text-xs font-bold text-[#3B1259] hover:text-[#581C87] underline"
+                        className="text-xs font-bold text-ug-700 hover:text-ug-900 underline decoration-2 underline-offset-4 cursor-pointer"
                       >
                         Buka Form Serah Terima &rarr;
                       </button>
@@ -365,7 +370,7 @@ export const AdminReviewDrawer = ({
                   </div>
                 </div>
               ) : (
-                <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 text-center text-xs text-slate-500">
+                <div className="bg-sheet/60 border-[1.5px] border-dashed border-line-strong rounded-[4px] p-4 text-center text-xs text-ink-3">
                   Belum ada barang fisik inventori yang dipasangkan.
                 </div>
               )}
@@ -373,61 +378,71 @@ export const AdminReviewDrawer = ({
               {/* Admin Notes */}
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Catatan Internal Petugas (admin_notes):
+                  <label htmlFor="drawer-admin-notes" className="text-[13px] font-bold text-ink">
+                    Catatan Internal Petugas (admin_notes)
                   </label>
                   {notesSaved && (
-                    <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                      <RiCheckboxCircleLine className="w-3.5 h-3.5" /> Tersimpan
+                    <span className="text-xs text-ok font-bold flex items-center gap-1">
+                      <LuCircleCheck className="size-4" aria-hidden="true" /> Tersimpan
                     </span>
                   )}
                 </div>
                 <textarea
+                  id="drawer-admin-notes"
                   rows={2}
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   placeholder="Catatan internal petugas loket..."
-                  className="w-full px-3.5 py-2.5 text-sm text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700"
+                  className={`${INPUT_CLASS} min-h-20 py-2.5 leading-relaxed`}
                 />
-                <div className="flex justify-end mt-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveNotes}
-                    className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 transition-colors inline-flex items-center gap-1.5"
-                  >
-                    <RiSaveLine className="w-3.5 h-3.5" />
-                    Simpan Catatan
-                  </button>
+                <div className="flex justify-end mt-2.5">
+                  <Button variant="outline" size="sm" onClick={handleSaveNotes}>
+                    <LuSave className="size-4" aria-hidden="true" />
+                    <span>Simpan Catatan</span>
+                  </Button>
                 </div>
               </div>
 
               {rejectPrompt && (
-                <div className="bg-rose-50 border border-rose-300 rounded-xl p-4 space-y-2.5">
-                  <span className="text-xs font-bold text-rose-900 block">
+                <div className="rounded-[5px] border-2 border-danger bg-danger-wash p-4 space-y-3">
+                  <label
+                    htmlFor="drawer-reject-reason"
+                    className="text-xs font-bold text-danger block"
+                  >
                     Alasan Penolakan Laporan {report.ticketCode}:
-                  </span>
+                  </label>
                   <input
+                    id="drawer-reject-reason"
                     type="text"
                     value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
+                    onChange={(e) => {
+                      setRejectReason(e.target.value);
+                      if (rejectError) setRejectError('');
+                    }}
                     placeholder="Contoh: Dibatalkan pelapor / laporan duplikat"
-                    className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-600"
+                    aria-invalid={rejectError ? true : undefined}
+                    className={`${INPUT_CLASS} h-10 ${rejectError ? 'border-danger' : ''}`}
                   />
+                  {rejectError && (
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-danger">
+                      <LuCircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                      <span>{rejectError}</span>
+                    </p>
+                  )}
                   <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRejectPrompt(false)}
-                      className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-lg"
+                    <Button
+                      variant="subtle"
+                      size="sm"
+                      onClick={() => {
+                        setRejectPrompt(false);
+                        setRejectError('');
+                      }}
                     >
                       Batal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleExecuteReject}
-                      className="px-3.5 py-1.5 bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold rounded-lg"
-                    >
+                    </Button>
+                    <Button variant="dangerSolid" size="sm" onClick={handleExecuteReject}>
                       Ya, Tolak Laporan
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -435,46 +450,68 @@ export const AdminReviewDrawer = ({
           </div>
 
           {/* Sticky Bottom Bar */}
-          <div className="p-4 sm:p-5 bg-white border-t border-slate-200 shrink-0 space-y-2">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              <button
-                type="button"
+          <div className="p-4 sm:p-5 bg-sheet border-t-2 border-ink shrink-0 space-y-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Button
+                variant="gold"
+                size="md"
                 disabled={report.status === 'Perlu Verifikasi' || report.status === 'Selesai'}
                 onClick={handleIssueInvitation}
-                className={`flex-1 bg-[#3B1259] hover:bg-[#581C87] text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 ${
-                  report.status === 'Perlu Verifikasi' || report.status === 'Selesai'
-                    ? 'opacity-50 cursor-not-allowed'
-                    : ''
-                }`}
+                className="flex-1"
               >
-                <RiSendPlaneLine className="w-4 h-4" />
+                <LuSend className="size-4" aria-hidden="true" />
                 <span>
                   {report.status === 'Perlu Verifikasi'
                     ? 'Undangan Telah Diterbitkan'
                     : 'Terbitkan Undangan Loket'}
                 </span>
-              </button>
+              </Button>
 
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="md"
                 disabled={report.status === 'Ditolak' || report.status === 'Selesai'}
                 onClick={() => setRejectPrompt(true)}
-                className={`bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors shrink-0 ${
-                  report.status === 'Ditolak' || report.status === 'Selesai'
-                    ? 'opacity-50 cursor-not-allowed'
-                    : ''
-                }`}
+                className="shrink-0"
               >
                 Tolak Laporan
-              </button>
+              </Button>
             </div>
-            <p className="text-xs text-slate-500 text-center">
+            <p className="text-xs text-ink-3 text-center">
               Sistem otomatis mengirim email undangan resmi ke{' '}
-              <span className="font-mono">{report.reporterEmail}</span>.
+              <span className="font-semibold text-ink-2">{report.reporterEmail}</span>.
             </p>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export const AdminReviewDrawer = ({
+  report,
+  isOpen,
+  onClose,
+  inventoryList,
+  onIssueInvitation,
+  onRejectReport,
+  onSaveNotes,
+  onOpenSecureFile,
+  onGoToHandover,
+}) => {
+  if (!isOpen || !report) return null;
+
+  return (
+    <DrawerContent
+      key={report.ticketCode}
+      report={report}
+      onClose={onClose}
+      inventoryList={inventoryList}
+      onIssueInvitation={onIssueInvitation}
+      onRejectReport={onRejectReport}
+      onSaveNotes={onSaveNotes}
+      onOpenSecureFile={onOpenSecureFile}
+      onGoToHandover={onGoToHandover}
+    />
   );
 };

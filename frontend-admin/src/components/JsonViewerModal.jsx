@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Button } from './ui/Button';
 import {
-  RiCloseLine,
-  RiFileCopyLine,
-  RiCheckLine,
-  RiShieldCheckLine,
-  RiCodeSSlashLine,
-} from 'react-icons/ri';
+  LuX,
+  LuCopy,
+  LuCheck,
+  LuShieldCheck,
+  LuCode,
+} from 'react-icons/lu';
 
 export const JsonViewerModal = ({ entry, onClose }) => {
   const [copied, setCopied] = useState(false);
@@ -21,77 +22,70 @@ export const JsonViewerModal = ({ entry, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-slate-900 text-white rounded-xl flex items-center justify-center">
-              <RiCodeSSlashLine className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                Audit Payload Inspector
-                <span className="font-mono text-xs text-slate-500">{entry.id}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ug-950/65">
+      <div className="bg-sheet border-2 border-ink rounded-[5px] shadow-[6px_6px_0_var(--color-ink)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="on-ug px-6 py-4 bg-ug-800 text-sheet border-b-2 border-ug-950 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <LuCode className="size-5 text-gold shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-sheet flex items-center gap-2 flex-wrap">
+                <span>Audit Payload Inspector</span>
+                <span className="rounded-[3px] bg-gold px-1.5 py-0.5 text-xs font-bold text-ug-950 tabular-nums">
+                  {entry.id}
+                </span>
               </h3>
-              <p className="text-xs text-slate-500 font-mono">
-                {entry.timestamp} • {entry.actorName} ({entry.actorId})
+              <p className="text-xs text-sheet/75 tabular-nums mt-0.5 truncate">
+                {entry.timestamp} · {entry.actorName} ({entry.actorId})
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="Tutup inspector"
+            className="text-sheet/80 hover:text-gold p-2 rounded-[4px] hover:bg-ug-900 transition-colors cursor-pointer shrink-0"
           >
-            <RiCloseLine className="w-5 h-5" />
+            <LuX className="size-5" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="px-6 py-3 bg-[#F8FAFC] border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="px-6 py-3 bg-paper border-b border-line-strong flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Target Entitas:</span>
-            <span className="font-mono font-semibold text-slate-900">{entry.targetTable}</span>
+            <span className="text-ink-3">Target Entitas:</span>
+            <span className="font-bold text-ink tabular-nums">{entry.targetTable}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Source IP:</span>
-            <span className="font-mono text-slate-700">{entry.ipAddress}</span>
+            <span className="text-ink-3">Source IP:</span>
+            <span className="font-semibold text-ink-2 tabular-nums">{entry.ipAddress}</span>
           </div>
         </div>
 
-        <div className="p-5 bg-slate-900 text-slate-100 overflow-auto flex-1 font-mono text-xs leading-relaxed max-h-[420px]">
+        <div className="p-5 bg-ug-950 text-paper overflow-auto flex-1 font-mono text-xs leading-relaxed max-h-[420px]">
           <pre>{jsonString}</pre>
         </div>
 
-        <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 text-slate-500 font-mono">
-            <RiShieldCheckLine className="w-4 h-4 text-emerald-600" />
+        <div className="px-6 py-3.5 bg-sheet border-t border-line-strong flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 text-ink-2 font-medium">
+            <LuShieldCheck className="size-4 text-ok shrink-0" aria-hidden="true" />
             <span>Hash Valid (SHA-256)</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-300 font-semibold transition-colors"
-            >
+            <Button variant="outline" size="sm" onClick={handleCopy}>
               {copied ? (
                 <>
-                  <RiCheckLine className="w-3.5 h-3.5 text-emerald-600" />
+                  <LuCheck className="size-4 text-ok" aria-hidden="true" />
                   <span>Tersalin!</span>
                 </>
               ) : (
                 <>
-                  <RiFileCopyLine className="w-3.5 h-3.5" />
+                  <LuCopy className="size-4" aria-hidden="true" />
                   <span>Salin JSON</span>
                 </>
               )}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-[#3B1259] hover:bg-[#581C87] text-white font-semibold rounded-xl transition-colors"
-            >
+            </Button>
+            <Button variant="ug" size="sm" onClick={onClose}>
               Tutup
-            </button>
+            </Button>
           </div>
         </div>
       </div>

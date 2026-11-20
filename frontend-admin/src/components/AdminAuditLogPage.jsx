@@ -1,15 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { AuditBadge } from './AdminBadges';
+import { Button } from './ui/Button';
+import { INPUT_CLASS } from './ui/styles';
 import {
-  RiShieldCheckLine,
-  RiSearchLine,
-  RiFilter3Line,
-  RiCalendarLine,
-  RiCodeSSlashLine,
-  RiDownload2Line,
-  RiTimeLine,
-  RiCheckboxCircleLine,
-} from 'react-icons/ri';
+  LuShieldCheck,
+  LuSearch,
+  LuFilter,
+  LuCalendar,
+  LuCode,
+  LuDownload,
+  LuClock,
+  LuCircleCheck,
+} from 'react-icons/lu';
 
 export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
   const [selectedAction, setSelectedAction] = useState('ALL');
@@ -64,52 +66,57 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b-2 border-ink">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-ink tracking-[-0.03em]">
               Audit Trail &amp; Log Keamanan
             </h1>
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#3B1259]">
-              <RiShieldCheckLine className="w-4 h-4 text-amber-600" />
-              <span>Immutable Log • Read Only</span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-ug-700">
+              <LuShieldCheck className="size-4" aria-hidden="true" />
+              <span>Immutable Log · Read Only</span>
             </span>
           </div>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-sm text-ink-2 mt-1">
             Rekam jejak seluruh mutasi status laporan, inventori, dan serah terima loket.
           </p>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="md"
           onClick={handleExportCsv}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shrink-0"
+          className="shrink-0"
         >
-          <RiDownload2Line className="w-3.5 h-3.5 text-slate-500" />
+          <LuDownload className="size-4" aria-hidden="true" />
           <span>Ekspor CSV Audit</span>
-        </button>
+        </Button>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+      <div className="rounded-[5px] border-2 border-ink bg-sheet p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
-            <RiSearchLine className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <LuSearch
+              className="size-4 text-ink-3 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+              aria-hidden="true"
+            />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari Admin ID, IP, atau Target ID..."
-              className="w-full pl-10 pr-3 py-2 text-sm font-mono text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700"
+              className={`${INPUT_CLASS} h-10 pl-10`}
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <RiFilter3Line className="w-4 h-4 text-slate-400 shrink-0" />
+            <LuFilter className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
             <select
               value={selectedAction}
               onChange={(e) => setSelectedAction(e.target.value)}
-              className="w-full px-3 py-2 text-sm font-mono text-slate-700 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700"
+              aria-label="Filter jenis aksi audit"
+              className={`${INPUT_CLASS} h-10 font-semibold`}
             >
               <option value="ALL">ALL (Semua Aksi)</option>
               <option value="STATUS_UPDATE">STATUS_UPDATE</option>
@@ -121,11 +128,12 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            <RiCalendarLine className="w-4 h-4 text-slate-400 shrink-0" />
+            <LuCalendar className="size-4 text-ink-3 shrink-0" aria-hidden="true" />
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="w-full px-3 py-2 text-sm text-slate-700 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-700"
+              aria-label="Filter rentang waktu audit"
+              className={`${INPUT_CLASS} h-10 font-semibold`}
             >
               <option value="ALL">Rentang: Seluruh Rekam Jejak</option>
               <option value="TODAY">Hari Ini</option>
@@ -137,25 +145,25 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="rounded-[5px] border-2 border-ink bg-sheet shadow-[6px_6px_0_var(--color-ink)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <tr className="bg-paper border-b-2 border-ink text-[11px] font-bold text-ink-2 uppercase tracking-[0.08em]">
                 <th className="py-3.5 px-5 w-48">Timestamp (WIB)</th>
                 <th className="py-3.5 px-4 w-48">Petugas / Aktor</th>
                 <th className="py-3.5 px-4 w-44">Aksi</th>
                 <th className="py-3.5 px-4 w-48">Target Tabel &amp; ID</th>
                 <th className="py-3.5 px-4">Detail Payload</th>
-                <th className="py-3.5 px-5 w-36 font-mono">IP Address</th>
+                <th className="py-3.5 px-5 w-36">IP Address</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-700">
+            <tbody className="divide-y divide-line text-ink">
               {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-14 text-center text-slate-500">
-                    <RiTimeLine className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="font-medium text-slate-700">Tidak ada log audit yang sesuai filter.</p>
+                  <td colSpan={6} className="py-14 text-center text-ink-3">
+                    <LuClock className="size-6 text-ink-3 mx-auto mb-2" aria-hidden="true" />
+                    <p className="font-bold text-ink">Tidak ada log audit yang sesuai filter.</p>
                   </td>
                 </tr>
               ) : (
@@ -164,15 +172,15 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
                   const isShort = truncatedPayload.length < 48;
 
                   return (
-                    <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-4 px-5 whitespace-nowrap font-mono text-xs">
-                        <span className="text-slate-800">{log.timestamp}</span>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{log.id}</div>
+                    <tr key={log.id} className="hover:bg-ug-100/40 transition-colors">
+                      <td className="py-4 px-5 whitespace-nowrap text-xs tabular-nums">
+                        <span className="font-semibold text-ink">{log.timestamp}</span>
+                        <div className="text-[11px] text-ink-3 mt-0.5">{log.id}</div>
                       </td>
 
                       <td className="py-4 px-4">
-                        <div className="font-semibold text-slate-900 text-sm">{log.actorName}</div>
-                        <div className="font-mono text-xs text-[#3B1259] font-medium mt-0.5">
+                        <div className="font-bold text-ink text-sm">{log.actorName}</div>
+                        <div className="text-xs text-ug-700 font-bold tabular-nums mt-0.5">
                           {log.actorId}
                         </div>
                       </td>
@@ -181,30 +189,31 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
                         <AuditBadge action={log.action} />
                       </td>
 
-                      <td className="py-4 px-4 font-mono text-xs font-medium text-slate-800 whitespace-nowrap">
+                      <td className="py-4 px-4 text-xs font-semibold text-ink tabular-nums whitespace-nowrap">
                         {log.targetTable}
                       </td>
 
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-between gap-2">
                           <code
-                            className="text-xs text-slate-600 truncate max-w-xs block font-mono"
+                            className="text-xs text-ink-2 truncate max-w-xs block font-mono"
                             title={truncatedPayload}
                           >
                             {isShort ? truncatedPayload : `${truncatedPayload.slice(0, 44)}...`}
                           </code>
-                          <button
-                            type="button"
+                          <Button
+                            variant="subtle"
+                            size="sm"
                             onClick={() => onOpenJsonModal(log)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 transition-colors shrink-0"
+                            className="shrink-0"
                           >
-                            <RiCodeSSlashLine className="w-3.5 h-3.5 text-[#3B1259]" />
+                            <LuCode className="size-4 text-ug-700" aria-hidden="true" />
                             <span>Lihat JSON</span>
-                          </button>
+                          </Button>
                         </div>
                       </td>
 
-                      <td className="py-4 px-5 font-mono text-xs text-slate-600 whitespace-nowrap">
+                      <td className="py-4 px-5 text-xs font-medium text-ink-2 tabular-nums whitespace-nowrap">
                         {log.ipAddress}
                       </td>
                     </tr>
@@ -215,12 +224,14 @@ export const AdminAuditLogPage = ({ logs, onOpenJsonModal }) => {
           </table>
         </div>
 
-        <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="px-5 py-3 bg-paper border-t border-line-strong flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-ink-2 tabular-nums">
           <div className="flex items-center gap-2">
-            <RiCheckboxCircleLine className="w-4 h-4 text-emerald-600" />
+            <LuCircleCheck className="size-4 text-ok shrink-0" aria-hidden="true" />
             <span>Audit Trail terverifikasi dan terkunci otomatis (append-only).</span>
           </div>
-          <div className="font-mono text-[11px]">{filteredLogs.length} Entries • Read-Only</div>
+          <div className="text-[11px] font-semibold text-ink-3">
+            {filteredLogs.length} Entries · Read-Only
+          </div>
         </div>
       </div>
     </div>
