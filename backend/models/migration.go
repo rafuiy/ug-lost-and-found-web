@@ -6,15 +6,21 @@ import (
 	"gorm.io/gorm"
 )
 
-func AutoMigrate(db *gorm.DB) {
+// AutoMigrate creates or updates all UGLF domain tables using GORM AutoMigrate.
+func AutoMigrate(db *gorm.DB) error {
 	err := db.AutoMigrate(
-		&User{},
-		&Role{},
 		&Permission{},
+		&Role{},
+		&Admin{},
+		&RevokedToken{},
+		&Report{},
+		&Inventory{},
+		&Handover{},
 		&AuditLog{},
 	)
 	if err != nil {
-		log.Fatal("Failed to auto migrate models:", err)
+		return err
 	}
 	log.Println("Auto migration completed successfully")
+	return nil
 }

@@ -1,24 +1,32 @@
 package models
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type AuditLog struct {
-	ID        uint                `gorm:"primaryKey" json:"id"`
-	UserID    uint                `json:"user_id"`
-	Action    string              `gorm:"type:varchar(50);not null" json:"action"`
-	Entity    string              `gorm:"type:varchar(100);not null" json:"entity"`
-	EntityID  uint                `json:"entity_id"`
-	OldValue  datatypes.JSONType  `gorm:"type:jsonb" json:"old_value"`
-	NewValue  datatypes.JSONType  `gorm:"type:jsonb" json:"new_value"`
-	CreatedAt time.Time           `json:"created_at"`
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
+	AdminID     *uuid.UUID     `gorm:"type:uuid;index" json:"admin_id"`
+	Admin       *Admin         `gorm:"foreignKey:AdminID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"admin,omitempty"`
+	Action      string         `gorm:"type:varchar(50);not null;index" json:"action"`
+	TargetTable string         `gorm:"type:varchar(50);not null;index" json:"target_table"`
+	TargetID    uuid.UUID      `gorm:"type:uuid;not null;index" json:"target_id"`
+	Payload     datatypes.JSON `gorm:"type:jsonb" json:"payload"`
+	IPAddress   *string        `gorm:"type:varchar(45)" json:"ip_address"`
+	CreatedAt   time.Time      `gorm:"index" json:"created_at"`
 }
 
 func (AuditLog) TableName() string {
 	return "audit_logs"
+}
+
+func (a *AuditLog) BeforeCreate(_ *gorm.DB) error {
+	if a.ID == uuid.Nil {
+		a.ID = uuid.New()
+	}
+	return nil
 }
