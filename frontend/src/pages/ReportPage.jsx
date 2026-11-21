@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import { LuArrowLeft, LuArrowRight, LuCheck, LuCopy, LuLoaderCircle, LuMail } from 'react-icons/lu'
-import { Link } from 'react-router'
+import { LuArrowLeft, LuArrowRight, LuCheck, LuCopy, LuLoaderCircle, LuMail, LuRotateCcw } from 'react-icons/lu'
+import { Link, useSearchParams } from 'react-router'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { Field } from '../components/ui/Field'
 import { FileField } from '../components/ui/FileField'
 import { Stamp } from '../components/ui/Stamp'
 import { Ticket } from '../components/ui/Ticket'
-import { submitReport } from '../services/endpoints/reports'
+import { submitReport, validateReopenToken } from '../services/endpoints/reports'
 import { toLocalInputValue } from '../utils/format'
 import { normalizePhone, validateReport } from '../utils/validation'
+
+const REPORT_CATEGORIES = [
+  'Elektronik',
+  'Aksesoris / Dompet',
+  'Identitas / Kartu',
+  'Kunci / Aksesoris',
+  'Tas / Pakaian',
+  'Dokumen / Buku',
+  'Lainnya',
+]
 
 const EMPTY_VALUES = {
   reporter_name: '',
@@ -17,6 +27,7 @@ const EMPTY_VALUES = {
   reporter_email: '',
   phone_number: '',
   item_name: '',
+  category: REPORT_CATEGORIES[0],
   loss_location: '',
   loss_datetime: '',
   item_description: '',
@@ -111,15 +122,72 @@ function ReportSuccess({ result }) {
 }
 
 export function ReportPage() {
+  const [searchParams] = useSearchParams()
+  const reopenToken = (searchParams.get('reopen') || '').trim()
+
   const [values, setValues] = useState(EMPTY_VALUES)
   const [files, setFiles] = useState({ ktm_krs: null, item_image: null })
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
   const [result, setResult] = useState(null)
+  const [reopenInfo, setReopenInfo] = useState(null)
+  const [reopenLoading, setReopenLoading] = useState(Boolean(reopenToken))
+  const [reopenError, setReopenError] = useState('')
   const [maxLossDate] = useState(() => toLocalInputValue(new Date()))
   const fieldRefs = useRef({})
   const alertRef = useRef(null)
+
+  useEffect(() => {
+    if (!reopenToken) return
+
+    let active = true
+    Promise.resolve()
+      .then(() => {
+        if (!active) return null
+        setReopenLoading(true)
+        setReopenError('')
+        return validateReopenToken(reopenToken)
+      })
+      .then((data) => {
+        if (!active || !data) return
+        setReopenInfo(data)
+        const parsedLossDate = data.loss_datetime ? new Date(data.loss_datetime) : null
+        const formattedLossDate =
+          parsedLossDate && !Number.isNaN(parsedLossDate.getTime())
+            ? toLocalInputValue(parsedLossDate)
+            : ''
+        setValues((prev) => ({
+          ...prev,
+          reporter_name: data.reporter_name || prev.reporter_name,
+          npm: data.npm || prev.npm,
+          reporter_email: data.reporter_email || prev.reporter_email,
+          phone_number: data.phone_number || prev.phone_number,
+          item_name: data.item_name || prev.item_name,
+          category:
+            data.category && REPORT_CATEGORIES.includes(data.category)
+              ? data.category
+              : prev.category,
+          loss_location: data.loss_location || prev.loss_location,
+          loss_datetime: formattedLossDate || prev.loss_datetime,
+          item_description: data.item_description || prev.item_description,
+        }))
+      })
+      .catch((err) => {
+        if (!active) return
+        setReopenInfo(null)
+        setReopenError(
+          err?.message || 'Tautan pengajuan ulang tidak valid atau sudah kedaluwarsa.'
+        )
+      })
+      .finally(() => {
+        if (active) setReopenLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [reopenToken])
 
   useEffect(() => {
     if (apiError) alertRef.current?.focus()
@@ -167,6 +235,9 @@ export function ReportPage() {
     for (const [key, value] of Object.entries(values)) body.append(key, value.trim())
     body.set('phone_number', normalizePhone(values.phone_number.trim()))
     body.set('loss_datetime', new Date(values.loss_datetime).toISOString())
+    if (reopenToken && reopenInfo) {
+      body.append('reopen_token', reopenToken)
+    }
     body.append('ktm_krs', files.ktm_krs)
     if (files.item_image) body.append('item_image', files.item_image)
 
@@ -211,6 +282,37 @@ export function ReportPage() {
             <span className="text-ink-3"><span aria-hidden="true" className="text-ug-600">*</span> wajib</span>
           </div>
 
+          {reopenLoading && (
+            <div className="border-b-2 border-dotted border-line-strong bg-ug-100/60 px-5 py-4 text-sm text-ink-2 sm:px-7 lg:px-8">
+              Memuat data pengajuan ulang laporan…
+            </div>
+          )}
+
+          {reopenInfo && (
+            <div className="border-b-2 border-dotted border-line-strong bg-ug-100/70 px-5 py-4 text-sm sm:px-7 lg:px-8">
+              <p className="flex items-center gap-2 font-bold text-ug-800">
+                <LuRotateCcw aria-hidden="true" className="size-4 shrink-0" />
+                <span>Pengajuan Ulang Laporan (Tiket Asal: {reopenInfo.original_ticket_code})</span>
+              </p>
+              {reopenInfo.cancel_reason && (
+                <p className="mt-1 text-ink-2">
+                  <strong className="text-ink">Alasan petugas:</strong> {reopenInfo.cancel_reason}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-ink-3">
+                Data dasar laporan lama telah diisi otomatis. Silakan lengkapi kembali ciri rahasia barang dan unggah foto KTM/KRS untuk menerbitkan tiket pengganti.
+              </p>
+            </div>
+          )}
+
+          {reopenError && (
+            <div className="border-b-2 border-dotted border-line-strong px-5 py-4 sm:px-7 lg:px-8">
+              <Alert role="alert" title="Tautan pengajuan ulang tidak dapat dipakai">
+                {reopenError} Kamu tetap dapat mengirim laporan kehilangan baru melalui formulir di bawah ini.
+              </Alert>
+            </div>
+          )}
+
           <Section n="01" title="Data diri" description="Untuk menghubungimu dan mencocokkan KTM di loket.">
             <Field label="Nama lengkap" autoComplete="name" {...bind('reporter_name')} />
             <Field label="NPM" inputMode="numeric" autoComplete="off" {...bind('npm')} hint="4 digit terakhirnya jadi kode verifikasi saat melacak." />
@@ -220,8 +322,9 @@ export function ReportPage() {
 
           <Section n="02" title="Barang yang hilang">
             <Field label="Nama barang" placeholder="mis. Dompet kulit cokelat" {...bind('item_name')} />
+            <Field label="Kategori barang" options={REPORT_CATEGORIES} {...bind('category')} />
             <Field label="Waktu kehilangan" type="datetime-local" max={maxLossDate} hint="Perkiraan juga boleh." {...bind('loss_datetime')} />
-            <Field label="Lokasi kehilangan" placeholder="mis. Lab komputer Gedung 4, lantai 3" className="sm:col-span-2" {...bind('loss_location')} />
+            <Field label="Lokasi kehilangan" placeholder="mis. Lab komputer Gedung 4, lantai 3" {...bind('loss_location')} />
             <Field
               label="Deskripsi barang"
               multiline

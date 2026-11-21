@@ -30,9 +30,9 @@ export function FieldMessage({ id, error, hint, hintIcon: HintIcon }) {
   )
 }
 
-export const Field = forwardRef(function Field({ id, label, hint, hintIcon, error, required = true, multiline = false, className = '', ...props }, ref) {
+export const Field = forwardRef(function Field({ id, label, hint, hintIcon, error, required = true, multiline = false, options = null, className = '', ...props }, ref) {
   const messageId = `${id}-message`
-  const Control = multiline ? 'textarea' : 'input'
+  const Control = options ? 'select' : multiline ? 'textarea' : 'input'
   return (
     <div className={className}>
       <FieldLabel htmlFor={id} required={required}>{label}</FieldLabel>
@@ -45,7 +45,15 @@ export const Field = forwardRef(function Field({ id, label, hint, hintIcon, erro
         aria-describedby={error || hint ? messageId : undefined}
         className={`${INPUT_CLASS} ${multiline ? 'min-h-24 py-2.5 leading-relaxed' : 'h-11'} ${error ? 'border-danger' : 'border-line-strong'}`}
         {...props}
-      />
+      >
+        {options
+          ? options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))
+          : undefined}
+      </Control>
       <FieldMessage id={messageId} error={error} hint={hint} hintIcon={hintIcon} />
     </div>
   )

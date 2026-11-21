@@ -19,6 +19,11 @@ export const STATUS = {
     title: 'Laporan ditolak',
     message: 'Laporan atau verifikasi di loket tidak dapat diterima.',
   },
+  Dibatalkan: {
+    tone: 'neutral',
+    title: 'Status laporan dibatalkan',
+    message: 'Status laporan sebelumnya telah dibatalkan oleh petugas loket. Cek email kamu untuk informasi lebih lanjut atau tautan pengajuan ulang.',
+  },
 }
 
 export const STALE_LABEL = 'Lawas >30 Hari'

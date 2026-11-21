@@ -1,10 +1,15 @@
 import { API_MOCK } from '../../config/site'
-import { mockSubmitReport, mockTrackReport } from '../api/mock'
+import { mockSubmitReport, mockTrackReport, mockValidateReopenToken } from '../api/mock'
 import { ApiError, request } from '../http/client'
 
 export function submitReport(formData) {
   if (API_MOCK) return mockSubmitReport()
   return request('/reports', { method: 'POST', body: formData, timeoutMs: 60000 })
+}
+
+export function validateReopenToken(token) {
+  if (API_MOCK) return mockValidateReopenToken(token)
+  return request(`/reports/reopen/${encodeURIComponent(token)}`, { method: 'GET' })
 }
 
 export async function trackReport(ticketCode, verificationCode) {

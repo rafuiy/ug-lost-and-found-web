@@ -60,15 +60,15 @@ function TrackResult({ report }) {
 
       {report.isStale && <p className="mt-4 max-w-xl text-sm leading-relaxed text-ink-3">{STALE_MESSAGE}</p>}
       {report.status === 'Perlu Verifikasi' && <VisitLetter visit={report.visit} />}
-      {report.status === 'Ditolak' && (
+      {(report.status === 'Ditolak' || report.status === 'Dibatalkan') && (
         <div className="mt-6 max-w-xl text-sm">
           {report.reason && (
             <p className="leading-relaxed text-ink-2">
-              <strong className="text-danger">Alasan:</strong> {report.reason}
+              <strong className={report.status === 'Ditolak' ? 'text-danger' : 'text-ink'}>Alasan:</strong> {report.reason}
             </p>
           )}
           <Button to="/lapor" variant="outline" className="mt-6">
-            Lapor ulang
+            {report.status === 'Dibatalkan' ? 'Buat laporan baru' : 'Lapor ulang'}
             <LuArrowRight aria-hidden="true" className="size-4" />
           </Button>
         </div>

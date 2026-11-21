@@ -30,3 +30,24 @@ export async function mockTrackReport({ ticket_code, verification_code }) {
   if (!fixture) throw new ApiError('not found', { status: 404 })
   return { ticket_code, created_at: new Date(Date.now() - 3 * 86400000).toISOString(), ...fixture }
 }
+
+export async function mockValidateReopenToken(token) {
+  await wait(400)
+  if (!token || token === 'invalid') {
+    throw new ApiError('Tautan pengajuan ulang tidak ditemukan atau tidak valid.', { status: 404 })
+  }
+  return {
+    original_ticket_code: 'UG-7X9K2',
+    cancelled_from: 'Ditolak',
+    cancel_reason: 'Pelapor Melengkapi Ciri Khusus',
+    reporter_name: 'Mahasiswa Gunadarma',
+    reporter_email: 'mahasiswa@student.gunadarma.ac.id',
+    npm: '51421890',
+    phone_number: '081289345671',
+    item_name: 'Laptop ASUS Vivobook',
+    category: 'Elektronik',
+    loss_location: 'Lab Komputer Gedung 4 Lt. 3 Kampus D',
+    loss_datetime: new Date(Date.now() - 2 * 86400000).toISOString(),
+    item_description: 'Laptop warna abu-abu gelap.',
+  }
+}

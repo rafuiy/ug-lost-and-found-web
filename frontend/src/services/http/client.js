@@ -8,7 +8,7 @@ export class ApiError extends Error {
   }
 }
 
-const CLIENT_ERROR_STATUSES = [400, 413, 415, 422]
+const CLIENT_ERROR_STATUSES = [400, 404, 409, 410, 413, 415, 422]
 
 export async function request(path, { timeoutMs = 30000, ...options } = {}) {
   let res
