@@ -13,7 +13,6 @@ import (
 	"backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -26,14 +25,14 @@ type LoginRequest struct {
 }
 
 type AdminProfileResponse struct {
-	ID          uuid.UUID `json:"id"`
-	Username    string    `json:"username"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	Role        string    `json:"role"`
-	RoleDisplay string    `json:"role_display"`
-	Permissions []string  `json:"permissions"`
-	IsActive    bool      `json:"is_active"`
+	ID          uint     `json:"id"`
+	Username    string   `json:"username"`
+	Email       string   `json:"email"`
+	Name        string   `json:"name"`
+	Role        string   `json:"role"`
+	RoleDisplay string   `json:"role_display"`
+	Permissions []string `json:"permissions"`
+	IsActive    bool     `json:"is_active"`
 }
 
 type LoginResponse struct {
@@ -207,7 +206,7 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 
 // Logout revokes the current JWT token (jti) so it cannot be reused and logs the event.
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
-	adminID, okID := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
+	adminID, okID := c.Locals(middlewares.LocalAdminID).(uint)
 	jti, okJTI := c.Locals(middlewares.LocalTokenJTI).(string)
 	exp, okExp := c.Locals(middlewares.LocalTokenExp).(time.Time)
 

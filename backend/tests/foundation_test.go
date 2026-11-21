@@ -14,7 +14,6 @@ import (
 	"backend/seeders"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -83,7 +82,6 @@ func TestFoundationMigrationAndIdempotentSeeding(t *testing.T) {
 func TestPrivateFilePathsExcludedFromJSON(t *testing.T) {
 	itemImg := "/storage/private/item.jpg"
 	report := models.Report{
-		ID:              uuid.New(),
 		TicketCode:      "UG-7X9K2",
 		ReporterName:    "Budi",
 		ReporterEmail:   "budi@student.gunadarma.ac.id",
@@ -108,10 +106,9 @@ func TestPrivateFilePathsExcludedFromJSON(t *testing.T) {
 	assert.NotContains(t, reportStr, itemImg)
 
 	handover := models.Handover{
-		ID:                uuid.New(),
 		ReportID:          report.ID,
-		InventoryID:       uuid.New(),
-		AdminID:           uuid.New(),
+		InventoryID:       1,
+		AdminID:           1,
 		RecipientName:     "Budi",
 		RecipientNPM:      "51421890",
 		HandoverProofPath: "/storage/private/proof.jpg",

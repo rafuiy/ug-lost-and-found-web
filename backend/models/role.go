@@ -2,9 +2,6 @@ package models
 
 import (
 	"time"
-
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 const (
@@ -13,7 +10,7 @@ const (
 )
 
 type Role struct {
-	ID          uuid.UUID    `gorm:"type:uuid;primaryKey" json:"id"`
+	ID          uint         `gorm:"primaryKey" json:"id"`
 	Name        string       `gorm:"type:varchar(50);uniqueIndex;not null" json:"name"`
 	DisplayName string       `gorm:"type:varchar(100);not null" json:"display_name"`
 	Description string       `gorm:"type:text" json:"description"`
@@ -24,11 +21,4 @@ type Role struct {
 
 func (Role) TableName() string {
 	return "roles"
-}
-
-func (r *Role) BeforeCreate(_ *gorm.DB) error {
-	if r.ID == uuid.Nil {
-		r.ID = uuid.New()
-	}
-	return nil
 }

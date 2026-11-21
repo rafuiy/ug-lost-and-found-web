@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -39,14 +40,14 @@ type loginSuccessEnvelope struct {
 		TokenType   string    `json:"token_type"`
 		ExpiresAt   time.Time `json:"expires_at"`
 		Admin       struct {
-			ID          uuid.UUID `json:"id"`
-			Username    string    `json:"username"`
-			Email       string    `json:"email"`
-			Name        string    `json:"name"`
-			Role        string    `json:"role"`
-			RoleDisplay string    `json:"role_display"`
-			Permissions []string  `json:"permissions"`
-			IsActive    bool      `json:"is_active"`
+			ID          uint     `json:"id"`
+			Username    string   `json:"username"`
+			Email       string   `json:"email"`
+			Name        string   `json:"name"`
+			Role        string   `json:"role"`
+			RoleDisplay string   `json:"role_display"`
+			Permissions []string `json:"permissions"`
+			IsActive    bool     `json:"is_active"`
 		} `json:"admin"`
 	} `json:"data"`
 }
@@ -240,7 +241,7 @@ func TestAuthMiddlewareAndJWTValidation(t *testing.T) {
 
 	// 4. Unsigned alg: none token -> 401 TOKEN_INVALID_ALGORITHM
 	algNoneHeader := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
-	algNonePayload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"` + uuid.NewString() + `","token_type":"access"}`))
+	algNonePayload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"999999999","token_type":"access"}`))
 	algNoneToken := algNoneHeader + "." + algNonePayload + "."
 	resp, body = doJSONRequest(t, app, "GET", "/api/v1/auth/me", nil, map[string]string{
 		"Authorization": "Bearer " + algNoneToken,
@@ -252,7 +253,7 @@ func TestAuthMiddlewareAndJWTValidation(t *testing.T) {
 
 	// 5. Wrong signing secret -> 401 TOKEN_SIGNATURE_INVALID
 	wrongSecretToken := jwt.NewWithClaims(jwt.SigningMethodHS256, utils.JWTClaims{
-		AdminID:   uuid.NewString(),
+		AdminID:   "999999999",
 		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.NewString(),
@@ -271,7 +272,7 @@ func TestAuthMiddlewareAndJWTValidation(t *testing.T) {
 
 	// 6. Expired JWT -> 401 TOKEN_EXPIRED
 	expiredToken := jwt.NewWithClaims(jwt.SigningMethodHS256, utils.JWTClaims{
-		AdminID:   uuid.NewString(),
+		AdminID:   "999999999",
 		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.NewString(),
@@ -405,4 +406,9 @@ func TestLoginRateLimiter(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "LOGIN_RATE_LIMITED", errEnv.Error.Code)
 	assert.Contains(t, errEnv.Error.Message, "10s")
+}
+
+// idStr formats an auto-increment primary key for request paths and bodies.
+func idStr(id uint) string {
+	return strconv.FormatUint(uint64(id), 10)
 }

@@ -77,7 +77,7 @@ func TestStaleJobMarksOldBelumAdaReportsIdempotently(t *testing.T) {
 	repOldPerluVerif := createAgedTestReport(t, db, models.ReportStatusPerluVerifikasi, 40, false)
 	repOldSelesai := createAgedTestReport(t, db, models.ReportStatusSelesai, 45, false)
 
-	reportIDs := []uuid.UUID{repOldBelumAda.ID, repFreshBelumAda.ID, repOldPerluVerif.ID, repOldSelesai.ID}
+	reportIDs := []uint{repOldBelumAda.ID, repFreshBelumAda.ID, repOldPerluVerif.ID, repOldSelesai.ID}
 	t.Cleanup(func() {
 		_ = db.Where("target_table = ? AND target_id IN ?", "reports", reportIDs).Delete(&models.AuditLog{}).Error
 		_ = db.Where("id IN ?", reportIDs).Delete(&models.Report{}).Error
@@ -122,7 +122,7 @@ func TestRestoreStaleReportRBACAndReAgingProtection(t *testing.T) {
 	repActive := createAgedTestReport(t, db, models.ReportStatusBelumAda, 5, false)
 	repStaleRejected := createAgedTestReport(t, db, models.ReportStatusDitolak, 35, true)
 
-	reportIDs := []uuid.UUID{repStale.ID, repActive.ID, repStaleRejected.ID}
+	reportIDs := []uint{repStale.ID, repActive.ID, repStaleRejected.ID}
 	t.Cleanup(func() {
 		_ = db.Where("target_table = ? AND target_id IN ?", "reports", reportIDs).Delete(&models.AuditLog{}).Error
 		_ = db.Where("id IN ?", reportIDs).Delete(&models.Report{}).Error

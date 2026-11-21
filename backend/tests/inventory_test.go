@@ -69,9 +69,9 @@ func TestInventoryAuthGuardAndNoPublicEndpoint(t *testing.T) {
 	}{
 		{"GET", "/api/v1/admin/inventories"},
 		{"POST", "/api/v1/admin/inventories"},
-		{"GET", "/api/v1/admin/inventories/" + uuid.NewString()},
-		{"PATCH", "/api/v1/admin/inventories/" + uuid.NewString()},
-		{"DELETE", "/api/v1/admin/inventories/" + uuid.NewString()},
+		{"GET", "/api/v1/admin/inventories/999999999"},
+		{"PATCH", "/api/v1/admin/inventories/999999999"},
+		{"DELETE", "/api/v1/admin/inventories/999999999"},
 	} {
 		resp, _ := doJSONRequest(t, app, tc.method, tc.path, nil, nil)
 		assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode, "%s %s must require JWT", tc.method, tc.path)
@@ -81,7 +81,7 @@ func TestInventoryAuthGuardAndNoPublicEndpoint(t *testing.T) {
 func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	cfg, db, app := setupInventoryTestEnv(t)
 
-	var createdIDs []uuid.UUID
+	var createdIDs []uint
 	t.Cleanup(func() {
 		if len(createdIDs) > 0 {
 			_ = db.Where("target_table = ? AND target_id IN ?", "inventories", createdIDs).Delete(&models.AuditLog{}).Error
@@ -200,8 +200,8 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	resp, _ = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories?status=Hilang", nil, adminHeaders)
 	assert.Equal(t, fiber.StatusUnprocessableEntity, resp.StatusCode)
 
-	// 6. GetByID: 200 valid, 400 invalid UUID, 404 not found
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/"+created1.Data.ID.String(), nil, petugasHeaders)
+	// 6. GetByID: 200 valid, 400 invalid ID, 404 not found
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/"+idStr(created1.Data.ID), nil, petugasHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
 	var fetched inventorySingleEnvelope
 	require.NoError(t, json.Unmarshal(body, &fetched))
@@ -211,9 +211,9 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
-	assert.Equal(t, "INVALID_UUID", errEnv.Error.Code)
+	assert.Equal(t, "INVALID_ID", errEnv.Error.Code)
 
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/"+uuid.NewString(), nil, petugasHeaders)
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/999999999", nil, petugasHeaders)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -223,7 +223,7 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	patchBody, _ := json.Marshal(map[string]string{
 		"item_details": "Dompet kulit cokelat diperbarui dengan ciri jahitan",
 	})
-	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+created1.Data.ID.String(), patchBody, petugasHeaders)
+	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+idStr(created1.Data.ID), patchBody, petugasHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
 	var updated inventorySingleEnvelope
 	require.NoError(t, json.Unmarshal(body, &updated))
@@ -233,11 +233,11 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	require.NoError(t, db.Where("action = ? AND target_id = ?", "INVENTORY_UPDATED", created1.Data.ID).First(&auditUpdated).Error)
 
 	// Empty {} -> 422
-	resp, _ = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+created1.Data.ID.String(), []byte(`{}`), petugasHeaders)
+	resp, _ = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+idStr(created1.Data.ID), []byte(`{}`), petugasHeaders)
 	assert.Equal(t, fiber.StatusUnprocessableEntity, resp.StatusCode)
 
 	// Attempt to change status directly -> 400 UNKNOWN_FIELD
-	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+created1.Data.ID.String(), []byte(`{"status":"Diambil"}`), adminHeaders)
+	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+idStr(created1.Data.ID), []byte(`{"status":"Diambil"}`), adminHeaders)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -245,7 +245,7 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 
 	// Inventory already Diambil -> 409 INVENTORY_ALREADY_CLAIMED on PATCH and DELETE
 	require.NoError(t, db.Model(&models.Inventory{}).Where("id = ?", created1.Data.ID).Update("status", models.InventoryStatusDiambil).Error)
-	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+created1.Data.ID.String(), patchBody, adminHeaders)
+	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+idStr(created1.Data.ID), patchBody, adminHeaders)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -253,9 +253,9 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 
 	delClaimedBody, _ := json.Marshal(map[string]string{
 		"reason":     "Coba hapus barang yang sudah diambil",
-		"confirm_id": created1.Data.ID.String(),
+		"confirm_id": idStr(created1.Data.ID),
 	})
-	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+created1.Data.ID.String(), delClaimedBody, adminHeaders)
+	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+idStr(created1.Data.ID), delClaimedBody, adminHeaders)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -284,17 +284,12 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 		_ = db.Where("id = ?", linkedRep.ID).Delete(&models.Report{}).Error
 	})
 
-	// Case-mismatch confirm_id (uppercase UUID) -> 422 VALIDATION_ERROR
-	upperConfirm, _ := json.Marshal(map[string]string{
-		"reason":     "Salah input duplikat",
-		"confirm_id": fmt.Sprintf("%s", uuid.MustParse(created2.Data.ID.String())),
-	})
-	_ = upperConfirm
+	// Mismatched confirm_id -> 422 VALIDATION_ERROR
 	badCaseBody, _ := json.Marshal(map[string]string{
 		"reason":     "Salah input duplikat",
 		"confirm_id": "INV-WRONG-ID",
 	})
-	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+created2.Data.ID.String(), badCaseBody, petugasHeaders)
+	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+idStr(created2.Data.ID), badCaseBody, petugasHeaders)
 	assert.Equal(t, fiber.StatusUnprocessableEntity, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -303,13 +298,13 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	// Valid DELETE -> 200 OK, soft-deleted in DB, unlinks report back to Belum Ada, writes INVENTORY_DELETED audit log
 	validDeleteBody, _ := json.Marshal(map[string]string{
 		"reason":     "Salah input data barang / duplikasi entri",
-		"confirm_id": created2.Data.ID.String(),
+		"confirm_id": idStr(created2.Data.ID),
 	})
-	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+created2.Data.ID.String(), validDeleteBody, petugasHeaders)
+	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+idStr(created2.Data.ID), validDeleteBody, petugasHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
 
 	// Active GET by ID must now return 404 INVENTORY_NOT_FOUND
-	resp, _ = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/"+created2.Data.ID.String(), nil, petugasHeaders)
+	resp, _ = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/"+idStr(created2.Data.ID), nil, petugasHeaders)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 
 	// Unscoped query confirms row still exists in PostgreSQL with deleted_at & delete_reason populated (Soft Delete)

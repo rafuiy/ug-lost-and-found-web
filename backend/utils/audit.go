@@ -7,7 +7,6 @@ import (
 
 	"backend/models"
 
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -16,10 +15,10 @@ import (
 // Callers must never pass plaintext passwords, tokens, or private document contents inside payload.
 func RecordAuditLog(
 	db *gorm.DB,
-	adminID *uuid.UUID,
+	adminID *uint,
 	action string,
 	targetTable string,
-	targetID uuid.UUID,
+	targetID uint,
 	payload interface{},
 	ipAddress string,
 ) error {

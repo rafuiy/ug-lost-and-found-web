@@ -9,7 +9,6 @@ import (
 	"backend/models"
 	"backend/utils"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -43,7 +42,7 @@ func MarkStaleReports(db *gorm.DB, now time.Time, thresholdDays int) (int64, err
 			return nil
 		}
 
-		ids := make([]uuid.UUID, 0, len(candidates))
+		ids := make([]uint, 0, len(candidates))
 		for _, rep := range candidates {
 			ids = append(ids, rep.ID)
 		}

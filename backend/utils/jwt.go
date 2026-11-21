@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,7 +58,7 @@ func GenerateAccessToken(admin *models.Admin, cfg *config.AppConfig) (string, st
 	}
 
 	claims := JWTClaims{
-		AdminID:     admin.ID.String(),
+		AdminID:     strconv.FormatUint(uint64(admin.ID), 10),
 		Username:    admin.Username,
 		Email:       admin.Email,
 		Name:        admin.Name,
@@ -68,7 +69,7 @@ func GenerateAccessToken(admin *models.Admin, cfg *config.AppConfig) (string, st
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			Issuer:    "uglf-backend",
-			Subject:   admin.ID.String(),
+			Subject:   strconv.FormatUint(uint64(admin.ID), 10),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),

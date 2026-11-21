@@ -16,17 +16,16 @@ import (
 	"backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type HandoverDetailResponse struct {
-	ID               uuid.UUID `json:"id"`
-	ReportID         uuid.UUID `json:"report_id"`
+	ID               uint      `json:"id"`
+	ReportID         uint      `json:"report_id"`
 	TicketCode       string    `json:"ticket_code"`
-	InventoryID      uuid.UUID `json:"inventory_id"`
-	AdminID          uuid.UUID `json:"admin_id"`
+	InventoryID      uint      `json:"inventory_id"`
+	AdminID          uint      `json:"admin_id"`
 	RecipientName    string    `json:"recipient_name"`
 	RecipientNPM     string    `json:"recipient_npm"`
 	HandoverNotes    *string   `json:"handover_notes"`
@@ -86,13 +85,13 @@ func (h *HandoverHandler) Create(c *fiber.Ctx) error {
 		}
 	}
 
-	var inventoryID uuid.UUID
+	var inventoryID uint
 	if inventoryIDRaw == "" {
 		fieldErrors["inventory_id"] = "ID inventori wajib diisi."
 	} else {
-		parsedInv, parseErr := uuid.Parse(inventoryIDRaw)
-		if parseErr != nil {
-			fieldErrors["inventory_id"] = "Format inventory_id harus berupa UUID yang valid."
+		parsedInv, ok := utils.ParseID(inventoryIDRaw)
+		if !ok {
+			fieldErrors["inventory_id"] = "Format inventory_id harus berupa angka ID yang valid."
 		} else {
 			inventoryID = parsedInv
 		}
@@ -133,8 +132,8 @@ func (h *HandoverHandler) Create(c *fiber.Ctx) error {
 		)
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 

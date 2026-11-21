@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -66,7 +65,7 @@ var allowedStatusTransitions = map[string]map[string]bool{
 }
 
 type AdminReportListItem struct {
-	ID                 uuid.UUID         `json:"id"`
+	ID                 uint              `json:"id"`
 	TicketCode         string            `json:"ticket_code"`
 	ReporterName       string            `json:"reporter_name"`
 	ReporterEmail      string            `json:"reporter_email"`
@@ -87,7 +86,7 @@ type AdminReportListItem struct {
 	CancelEmailType    *string           `json:"cancel_email_type,omitempty"`
 	ResubmitLink       *string           `json:"resubmit_link,omitempty"`
 	ReopenedFromTicket *string           `json:"reopened_from_ticket,omitempty"`
-	MatchedInventoryID *uuid.UUID        `json:"matched_inventory_id"`
+	MatchedInventoryID *uint             `json:"matched_inventory_id"`
 	MatchedInventory   *models.Inventory `json:"matched_inventory,omitempty"`
 	HasKtmKrs          bool              `json:"has_ktm_krs"`
 	HasItemImage       bool              `json:"has_item_image"`
@@ -120,7 +119,7 @@ type AdminReportFileInfo struct {
 }
 
 type AdminReportDetail struct {
-	ID                 uuid.UUID           `json:"id"`
+	ID                 uint                `json:"id"`
 	TicketCode         string              `json:"ticket_code"`
 	ReporterName       string              `json:"reporter_name"`
 	ReporterEmail      string              `json:"reporter_email"`
@@ -143,7 +142,7 @@ type AdminReportDetail struct {
 	CancelEmailType    *string             `json:"cancel_email_type,omitempty"`
 	ResubmitLink       *string             `json:"resubmit_link,omitempty"`
 	ReopenedFromTicket *string             `json:"reopened_from_ticket,omitempty"`
-	MatchedInventoryID *uuid.UUID          `json:"matched_inventory_id"`
+	MatchedInventoryID *uint               `json:"matched_inventory_id"`
 	MatchedInventory   *models.Inventory   `json:"matched_inventory,omitempty"`
 	Handover           *models.Handover    `json:"handover,omitempty"`
 	Files              AdminReportFileInfo `json:"files"`
@@ -371,7 +370,7 @@ func (h *AdminReportHandler) List(c *fiber.Ctx) error {
 	})
 }
 
-// GetDetail returns complete report review data (including secret_traits and file availability) by UUID or ticket code.
+// GetDetail returns complete report review data (including secret_traits and file availability) by numeric ID or ticket code.
 func (h *AdminReportHandler) GetDetail(c *fiber.Ctx) error {
 	if config.DB == nil {
 		return utils.SendError(c, fiber.StatusInternalServerError, "DB_NOT_INITIALIZED", "Koneksi database belum siap.", nil)
@@ -465,29 +464,29 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 		includeResubmitLink = *req.IncludeResubmitLink
 	}
 
-	var parsedMatchedInvID *uuid.UUID
+	var parsedMatchedInvID *uint
 	clearMatchedInv := false
 	if req.MatchedInventoryID != nil {
 		rawInv := strings.TrimSpace(*req.MatchedInventoryID)
 		if rawInv == "" {
 			clearMatchedInv = true
 		} else {
-			uid, err := uuid.Parse(rawInv)
-			if err != nil {
+			uid, ok := utils.ParseID(rawInv)
+			if !ok {
 				return utils.SendError(
 					c,
 					fiber.StatusUnprocessableEntity,
 					"VALIDATION_ERROR",
 					"Format matched_inventory_id tidak valid.",
-					map[string]string{"matched_inventory_id": "Harus berupa UUID inventori yang valid."},
+					map[string]string{"matched_inventory_id": "Harus berupa angka ID inventori yang valid."},
 				)
 			}
 			parsedMatchedInvID = &uid
 		}
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -761,29 +760,29 @@ func (h *AdminReportHandler) UpdateNotes(c *fiber.Ctx) error {
 		)
 	}
 
-	var parsedMatchedInvID *uuid.UUID
+	var parsedMatchedInvID *uint
 	clearMatchedInv := false
 	if req.MatchedInventoryID != nil {
 		rawInv := strings.TrimSpace(*req.MatchedInventoryID)
 		if rawInv == "" {
 			clearMatchedInv = true
 		} else {
-			uid, err := uuid.Parse(rawInv)
-			if err != nil {
+			uid, ok := utils.ParseID(rawInv)
+			if !ok {
 				return utils.SendError(
 					c,
 					fiber.StatusUnprocessableEntity,
 					"VALIDATION_ERROR",
 					"Format matched_inventory_id tidak valid.",
-					map[string]string{"matched_inventory_id": "Harus berupa UUID inventori yang valid."},
+					map[string]string{"matched_inventory_id": "Harus berupa angka ID inventori yang valid."},
 				)
 			}
 			parsedMatchedInvID = &uid
 		}
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -890,8 +889,8 @@ func (h *AdminReportHandler) Restore(c *fiber.Ctx) error {
 		}
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -1005,8 +1004,8 @@ func (h *AdminReportHandler) StreamPrivateFile(c *fiber.Ctx) error {
 		)
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -1096,7 +1095,7 @@ func (h *AdminReportHandler) StreamPrivateFile(c *fiber.Ctx) error {
 
 func applyReportIdentifierScope(db *gorm.DB, rawID string) (*gorm.DB, *utils.AppError) {
 	trimmed := strings.TrimSpace(rawID)
-	if uid, err := uuid.Parse(trimmed); err == nil {
+	if uid, ok := utils.ParseID(trimmed); ok {
 		return db.Where("id = ?", uid), nil
 	}
 
@@ -1108,7 +1107,7 @@ func applyReportIdentifierScope(db *gorm.DB, rawID string) (*gorm.DB, *utils.App
 	return nil, &utils.AppError{
 		Status:  fiber.StatusBadRequest,
 		Code:    "INVALID_REPORT_ID",
-		Message: "Parameter ID laporan tidak valid (gunakan UUID laporan atau kode tiket berformat UG-XXXXX).",
+		Message: "Parameter ID laporan tidak valid (gunakan ID laporan atau kode tiket berformat UG-XXXXX).",
 	}
 }
 

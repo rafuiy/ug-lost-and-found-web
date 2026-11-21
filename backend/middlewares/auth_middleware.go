@@ -10,7 +10,6 @@ import (
 	"backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -107,8 +106,8 @@ func AuthMiddleware(cfg *config.AppConfig) fiber.Handler {
 			)
 		}
 
-		adminUUID, err := uuid.Parse(claims.AdminID)
-		if err != nil {
+		adminID, ok := utils.ParseID(claims.AdminID)
+		if !ok {
 			return utils.SendError(
 				c,
 				fiber.StatusUnauthorized,
@@ -119,7 +118,7 @@ func AuthMiddleware(cfg *config.AppConfig) fiber.Handler {
 		}
 
 		var admin models.Admin
-		if err := config.DB.Preload("Role.Permissions").Where("id = ?", adminUUID).First(&admin).Error; err != nil {
+		if err := config.DB.Preload("Role.Permissions").Where("id = ?", adminID).First(&admin).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return utils.SendError(
 					c,

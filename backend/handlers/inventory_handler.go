@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"regexp"
 	"sort"
 	"strconv"
@@ -218,8 +217,8 @@ func (h *InventoryHandler) Create(c *fiber.Ctx) error {
 		)
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -266,11 +265,11 @@ func (h *InventoryHandler) Create(c *fiber.Ctx) error {
 	return utils.SendSuccess(c, fiber.StatusCreated, inv)
 }
 
-// GetByID returns a single internal inventory record by UUID.
+// GetByID returns a single internal inventory record by numeric ID.
 func (h *InventoryHandler) GetByID(c *fiber.Ctx) error {
-	invID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_UUID", "Parameter ID inventori tidak valid (harus berupa UUID).", nil)
+	invID, ok := utils.ParseID(c.Params("id"))
+	if !ok {
+		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_ID", "Parameter ID inventori tidak valid (harus berupa angka ID).", nil)
 	}
 
 	if config.DB == nil {
@@ -290,9 +289,9 @@ func (h *InventoryHandler) GetByID(c *fiber.Ctx) error {
 
 // Update edits editable fields of a 'Tersimpan' inventory record (status changes are blocked here).
 func (h *InventoryHandler) Update(c *fiber.Ctx) error {
-	invID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_UUID", "Parameter ID inventori tidak valid (harus berupa UUID).", nil)
+	invID, ok := utils.ParseID(c.Params("id"))
+	if !ok {
+		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_ID", "Parameter ID inventori tidak valid (harus berupa angka ID).", nil)
 	}
 
 	var req UpdateInventoryRequest
@@ -393,8 +392,8 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 		)
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -463,13 +462,13 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 	return utils.SendSuccess(c, fiber.StatusOK, updated)
 }
 
-// Delete soft-deletes a 'Tersimpan' inventory record after case-sensitive ID verification,
+// Delete soft-deletes a 'Tersimpan' inventory record after exact ID confirmation,
 // atomically unlinks any matched reports (reverting 'Perlu Verifikasi' -> 'Belum Ada'), and writes audit logs.
 func (h *InventoryHandler) Delete(c *fiber.Ctx) error {
 	rawID := strings.TrimSpace(c.Params("id"))
-	invID, err := uuid.Parse(rawID)
-	if err != nil {
-		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_UUID", "Parameter ID inventori tidak valid (harus berupa UUID).", nil)
+	invID, ok := utils.ParseID(rawID)
+	if !ok {
+		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_ID", "Parameter ID inventori tidak valid (harus berupa angka ID).", nil)
 	}
 
 	var req DeleteInventoryRequest
@@ -486,8 +485,8 @@ func (h *InventoryHandler) Delete(c *fiber.Ctx) error {
 	}
 	if confirmID == "" {
 		fieldErrors["confirm_id"] = "Konfirmasi ID inventori wajib diisi."
-	} else if confirmID != rawID {
-		fieldErrors["confirm_id"] = fmt.Sprintf("Konfirmasi ID inventori harus sama persis dengan '%s' (case-sensitive).", rawID)
+	} else if confirmID != fmt.Sprint(invID) {
+		fieldErrors["confirm_id"] = fmt.Sprintf("Konfirmasi ID inventori harus sama persis dengan '%d'.", invID)
 	}
 
 	if len(fieldErrors) > 0 {
@@ -500,8 +499,8 @@ func (h *InventoryHandler) Delete(c *fiber.Ctx) error {
 		)
 	}
 
-	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
-	if !ok || adminID == uuid.Nil {
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uint)
+	if !ok || adminID == 0 {
 		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
 	}
 
@@ -548,7 +547,7 @@ func (h *InventoryHandler) Delete(c *fiber.Ctx) error {
 			if rep.Status == models.ReportStatusPerluVerifikasi {
 				newRepStatus = models.ReportStatusBelumAda
 				repUpdates["status"] = newRepStatus
-				noteAddition := fmt.Sprintf("Tautan inventori [%s] dilepas karena inventori dihapus (%s) — status dikembalikan ke Belum Ada.", invID.String(), reason)
+				noteAddition := fmt.Sprintf("Tautan inventori [%d] dilepas karena inventori dihapus (%s) — status dikembalikan ke Belum Ada.", invID, reason)
 				if rep.AdminNotes != nil && strings.TrimSpace(*rep.AdminNotes) != "" {
 					repUpdates["admin_notes"] = strings.TrimSpace(*rep.AdminNotes) + " | " + noteAddition
 				} else {

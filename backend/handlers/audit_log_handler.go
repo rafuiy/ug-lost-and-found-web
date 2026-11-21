@@ -11,7 +11,6 @@ import (
 	"backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -31,14 +30,14 @@ var allowedAuditSortColumns = map[string]string{
 }
 
 type AuditLogItemResponse struct {
-	ID            uuid.UUID      `json:"id"`
-	AdminID       *uuid.UUID     `json:"admin_id"`
+	ID            uint           `json:"id"`
+	AdminID       *uint          `json:"admin_id"`
 	ActorName     string         `json:"actor_name"`
 	ActorUsername string         `json:"actor_username,omitempty"`
 	ActorRole     string         `json:"actor_role,omitempty"`
 	Action        string         `json:"action"`
 	TargetTable   string         `json:"target_table"`
-	TargetID      uuid.UUID      `json:"target_id"`
+	TargetID      uint           `json:"target_id"`
 	Payload       datatypes.JSON `json:"payload"`
 	IPAddress     *string        `json:"ip_address"`
 	CreatedAt     time.Time      `json:"created_at"`
@@ -66,29 +65,29 @@ func (h *AuditLogHandler) List(c *fiber.Ctx) error {
 	}
 
 	rawAdminID := strings.TrimSpace(c.Query("admin_id"))
-	var adminFilterUUID *uuid.UUID
+	var adminFilterID *uint
 	filterSystem := false
 	if rawAdminID != "" {
 		if strings.EqualFold(rawAdminID, "system") {
 			filterSystem = true
 		} else {
-			uid, err := uuid.Parse(rawAdminID)
-			if err != nil {
-				fieldErrors["admin_id"] = "Parameter admin_id harus berupa UUID yang valid atau 'system'."
+			uid, ok := utils.ParseID(rawAdminID)
+			if !ok {
+				fieldErrors["admin_id"] = "Parameter admin_id harus berupa angka ID yang valid atau 'system'."
 			} else {
-				adminFilterUUID = &uid
+				adminFilterID = &uid
 			}
 		}
 	}
 
 	rawTargetID := strings.TrimSpace(c.Query("target_id"))
-	var targetFilterUUID *uuid.UUID
+	var targetFilterID *uint
 	if rawTargetID != "" {
-		uid, err := uuid.Parse(rawTargetID)
-		if err != nil {
-			fieldErrors["target_id"] = "Parameter target_id harus berupa UUID yang valid."
+		uid, ok := utils.ParseID(rawTargetID)
+		if !ok {
+			fieldErrors["target_id"] = "Parameter target_id harus berupa angka ID yang valid."
 		} else {
-			targetFilterUUID = &uid
+			targetFilterID = &uid
 		}
 	}
 
@@ -160,11 +159,11 @@ func (h *AuditLogHandler) List(c *fiber.Ctx) error {
 	}
 	if filterSystem {
 		query = query.Where("audit_logs.admin_id IS NULL")
-	} else if adminFilterUUID != nil {
-		query = query.Where("audit_logs.admin_id = ?", *adminFilterUUID)
+	} else if adminFilterID != nil {
+		query = query.Where("audit_logs.admin_id = ?", *adminFilterID)
 	}
-	if targetFilterUUID != nil {
-		query = query.Where("audit_logs.target_id = ?", *targetFilterUUID)
+	if targetFilterID != nil {
+		query = query.Where("audit_logs.target_id = ?", *targetFilterID)
 	}
 	if dateFromPtr != nil {
 		query = query.Where("audit_logs.created_at >= ?", *dateFromPtr)
@@ -216,11 +215,11 @@ func (h *AuditLogHandler) List(c *fiber.Ctx) error {
 	})
 }
 
-// GetByID returns a single immutable audit log entry by UUID.
+// GetByID returns a single immutable audit log entry by numeric ID.
 func (h *AuditLogHandler) GetByID(c *fiber.Ctx) error {
-	logID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_UUID", "Parameter ID audit log tidak valid (harus berupa UUID).", nil)
+	logID, ok := utils.ParseID(c.Params("id"))
+	if !ok {
+		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_ID", "Parameter ID audit log tidak valid (harus berupa angka ID).", nil)
 	}
 
 	if config.DB == nil {

@@ -1,8 +1,6 @@
 package models
 
 import (
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 	"time"
 )
 
@@ -15,7 +13,7 @@ const (
 )
 
 type Report struct {
-	ID                     uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	ID                     uint       `gorm:"primaryKey" json:"id"`
 	TicketCode             string     `gorm:"type:varchar(12);uniqueIndex;not null" json:"ticket_code"`
 	ReporterName           string     `gorm:"type:varchar(100);not null" json:"reporter_name"`
 	ReporterEmail          string     `gorm:"type:varchar(100);not null" json:"reporter_email"`
@@ -42,7 +40,7 @@ type Report struct {
 	ResubmitTokenExpiresAt *time.Time `json:"-"`
 	ResubmitTokenUsedAt    *time.Time `json:"-"`
 	ReopenedFromTicket     *string    `gorm:"type:varchar(12);index" json:"reopened_from_ticket,omitempty"`
-	MatchedInventoryID     *uuid.UUID `gorm:"type:uuid;index" json:"matched_inventory_id"`
+	MatchedInventoryID     *uint      `gorm:"index" json:"matched_inventory_id"`
 	MatchedInventory       *Inventory `gorm:"foreignKey:MatchedInventoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"matched_inventory,omitempty"`
 	CreatedAt              time.Time  `gorm:"index" json:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`
@@ -51,11 +49,4 @@ type Report struct {
 
 func (Report) TableName() string {
 	return "reports"
-}
-
-func (r *Report) BeforeCreate(_ *gorm.DB) error {
-	if r.ID == uuid.Nil {
-		r.ID = uuid.New()
-	}
-	return nil
 }

@@ -124,7 +124,7 @@ func submitSampleReport(t *testing.T, app *fiber.App, spy *spyEmailSender, field
 func TestAdminReportAuthGuard(t *testing.T) {
 	_, _, app, _, _ := setupAdminReportTestEnv(t, nil)
 
-	id := uuid.NewString()
+	id := "999999999"
 	for _, tc := range []struct {
 		method string
 		path   string
@@ -235,7 +235,7 @@ func TestAdminReportListFilterStatsAndDataMinimization(t *testing.T) {
 	}
 }
 
-func TestAdminReportDetailByUUIDAndTicketCode(t *testing.T) {
+func TestAdminReportDetailByIDAndTicketCode(t *testing.T) {
 	cfg, db, app, spy, _ := setupAdminReportTestEnv(t, nil)
 
 	fields := defaultReportFormFields()
@@ -252,8 +252,8 @@ func TestAdminReportDetailByUUIDAndTicketCode(t *testing.T) {
 	petugasLogin := loginForTest(t, app, "petugas@gmail.com", cfg.SeedPetugasPassword)
 	authHeaders := map[string]string{"Authorization": "Bearer " + petugasLogin.Data.AccessToken}
 
-	// Lookup by UUID and by ticket code must return identical data
-	for _, identifier := range []string{dbReport.ID.String(), ticket} {
+	// Lookup by numeric ID and by ticket code must return identical data
+	for _, identifier := range []string{idStr(dbReport.ID), ticket} {
 		resp, body := doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+identifier, nil, authHeaders)
 		require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
 
@@ -263,9 +263,9 @@ func TestAdminReportDetailByUUIDAndTicketCode(t *testing.T) {
 
 		var detailResp struct {
 			Data struct {
-				ID           uuid.UUID `json:"id"`
-				TicketCode   string    `json:"ticket_code"`
-				SecretTraits string    `json:"secret_traits"`
+				ID           uint   `json:"id"`
+				TicketCode   string `json:"ticket_code"`
+				SecretTraits string `json:"secret_traits"`
 				Files        struct {
 					HasKtmKrs        bool `json:"has_ktm_krs"`
 					HasItemImage     bool `json:"has_item_image"`
@@ -288,8 +288,8 @@ func TestAdminReportDetailByUUIDAndTicketCode(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "INVALID_REPORT_ID", errEnv.Error.Code)
 
-	// Missing UUID -> 404 REPORT_NOT_FOUND
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+uuid.NewString(), nil, authHeaders)
+	// Missing ID -> 404 REPORT_NOT_FOUND
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/reports/999999999", nil, authHeaders)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -300,8 +300,8 @@ func TestAdminReportStatusTransitionsNotesAndEmails(t *testing.T) {
 	cfg, db, app, spy, _ := setupAdminReportTestEnv(t, nil)
 
 	var createdTickets []string
-	var createdInvIDs []uuid.UUID
-	var createdReportIDs []uuid.UUID
+	var createdInvIDs []uint
+	var createdReportIDs []uint
 	t.Cleanup(func() {
 		if len(createdReportIDs) > 0 {
 			_ = db.Where("target_table = ? AND target_id IN ?", "reports", createdReportIDs).Delete(&models.AuditLog{}).Error
@@ -370,7 +370,7 @@ func TestAdminReportStatusTransitionsNotesAndEmails(t *testing.T) {
 	// 2. Reject trying to match Diambil inventory -> 409 INVENTORY_ALREADY_CLAIMED
 	badInvPayload, _ := json.Marshal(map[string]string{
 		"status":               models.ReportStatusPerluVerifikasi,
-		"matched_inventory_id": invDiambil.ID.String(),
+		"matched_inventory_id": idStr(invDiambil.ID),
 	})
 	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", badInvPayload, authHeaders)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
@@ -381,7 +381,7 @@ func TestAdminReportStatusTransitionsNotesAndEmails(t *testing.T) {
 	// 3. Belum Ada -> Perlu Verifikasi with valid Tersimpan inventory -> 200 + invitation email
 	invitePayload, _ := json.Marshal(map[string]string{
 		"status":               models.ReportStatusPerluVerifikasi,
-		"matched_inventory_id": invTersimpan.ID.String(),
+		"matched_inventory_id": idStr(invTersimpan.ID),
 		"admin_notes":          "INTERNAL-ONLY-NOTE-DO-NOT-EMAIL",
 	})
 	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", invitePayload, authHeaders)
@@ -390,8 +390,8 @@ func TestAdminReportStatusTransitionsNotesAndEmails(t *testing.T) {
 	var statusUpdateResp struct {
 		Data struct {
 			Report struct {
-				Status             string     `json:"status"`
-				MatchedInventoryID *uuid.UUID `json:"matched_inventory_id"`
+				Status             string `json:"status"`
+				MatchedInventoryID *uint  `json:"matched_inventory_id"`
 			} `json:"report"`
 			EmailNotification struct {
 				Queued    bool   `json:"queued"`
@@ -434,8 +434,8 @@ func TestAdminReportStatusTransitionsNotesAndEmails(t *testing.T) {
 	var reopened struct {
 		Data struct {
 			Report struct {
-				Status             string     `json:"status"`
-				MatchedInventoryID *uuid.UUID `json:"matched_inventory_id"`
+				Status             string `json:"status"`
+				MatchedInventoryID *uint  `json:"matched_inventory_id"`
 			} `json:"report"`
 		} `json:"data"`
 	}
@@ -530,8 +530,8 @@ func TestAdminReportPrivateFileStreamingAndSecurity(t *testing.T) {
 	require.NoError(t, db.Where("ticket_code = ?", ticketKTMOnly).First(&repKTM).Error)
 
 	t.Cleanup(func() {
-		_ = db.Where("target_table = ? AND target_id IN ?", "reports", []uuid.UUID{repBoth.ID, repKTM.ID}).Delete(&models.AuditLog{}).Error
-		_ = db.Where("id IN ?", []uuid.UUID{repBoth.ID, repKTM.ID}).Delete(&models.Report{}).Error
+		_ = db.Where("target_table = ? AND target_id IN ?", "reports", []uint{repBoth.ID, repKTM.ID}).Delete(&models.AuditLog{}).Error
+		_ = db.Where("id IN ?", []uint{repBoth.ID, repKTM.ID}).Delete(&models.Report{}).Error
 	})
 
 	petugasLogin := loginForTest(t, app, "petugas@gmail.com", cfg.SeedPetugasPassword)
@@ -539,7 +539,7 @@ func TestAdminReportPrivateFileStreamingAndSecurity(t *testing.T) {
 
 	// 1. Stream ktm_krs (and alias ktm) -> 200, exact PNG bytes, defensive headers, audit log created
 	for _, fileType := range []string{"ktm_krs", "ktm"} {
-		req := httptest.NewRequest("GET", "/api/v1/admin/reports/"+repBoth.ID.String()+"/files/"+fileType, nil)
+		req := httptest.NewRequest("GET", "/api/v1/admin/reports/"+idStr(repBoth.ID)+"/files/"+fileType, nil)
 		req.Header.Set("Authorization", authHeaders["Authorization"])
 		resp, err := app.Test(req, -1)
 		require.NoError(t, err)
@@ -572,14 +572,14 @@ func TestAdminReportPrivateFileStreamingAndSecurity(t *testing.T) {
 	assert.Equal(t, int64(3), fileAuditCount)
 
 	// 2. Request missing optional file -> 404 FILE_NOT_UPLOADED
-	resp, body := doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+repKTM.ID.String()+"/files/item_image", nil, authHeaders)
+	resp, body := doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+idStr(repKTM.ID)+"/files/item_image", nil, authHeaders)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 	var errEnv apiErrorEnvelope
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "FILE_NOT_UPLOADED", errEnv.Error.Code)
 
 	// 3. Invalid file_type -> 400 INVALID_FILE_TYPE
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+repBoth.ID.String()+"/files/secret", nil, authHeaders)
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+idStr(repBoth.ID)+"/files/secret", nil, authHeaders)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -587,7 +587,7 @@ func TestAdminReportPrivateFileStreamingAndSecurity(t *testing.T) {
 
 	// 4. Path traversal defense: tampered DB ktm_krs_path = "../../.env" must be rejected with 400 INVALID_FILE_PATH
 	require.NoError(t, db.Model(&models.Report{}).Where("id = ?", repKTM.ID).Update("ktm_krs_path", "../../.env").Error)
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+repKTM.ID.String()+"/files/ktm_krs", nil, authHeaders)
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/reports/"+idStr(repKTM.ID)+"/files/ktm_krs", nil, authHeaders)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))

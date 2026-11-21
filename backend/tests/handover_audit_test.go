@@ -19,7 +19,6 @@ import (
 	"backend/seeders"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -138,8 +137,8 @@ func TestHandoverAuthAndValidation(t *testing.T) {
 		t,
 		app,
 		map[string]string{
-			"report_id":      uuid.NewString(),
-			"inventory_id":   uuid.NewString(),
+			"report_id":      "999999999",
+			"inventory_id":   "999999999",
 			"recipient_name": "Penerima Uji",
 			"recipient_npm":  "51421890",
 		},
@@ -160,9 +159,9 @@ func TestHandoverAuthAndValidation(t *testing.T) {
 func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 	cfg, db, app, spy, uploadDir := setupHandoverAuditTestEnv(t, nil)
 
-	var handoverIDs []uuid.UUID
-	var reportIDs []uuid.UUID
-	var invIDs []uuid.UUID
+	var handoverIDs []uint
+	var reportIDs []uint
+	var invIDs []uint
 
 	t.Cleanup(func() {
 		if len(handoverIDs) > 0 {
@@ -219,7 +218,7 @@ func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 		app,
 		map[string]string{
 			"report_id":      ticket,
-			"inventory_id":   invTersimpan.ID.String(),
+			"inventory_id":   idStr(invTersimpan.ID),
 			"recipient_name": "Fakhriza Test",
 			"recipient_npm":  "51421890",
 		},
@@ -235,7 +234,7 @@ func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 	// Move report to Perlu Verifikasi
 	statusPayload, _ := json.Marshal(map[string]string{
 		"status":               models.ReportStatusPerluVerifikasi,
-		"matched_inventory_id": invTersimpan.ID.String(),
+		"matched_inventory_id": idStr(invTersimpan.ID),
 	})
 	resp, _ := doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket+"/status", statusPayload, authHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode)
@@ -247,7 +246,7 @@ func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 		app,
 		map[string]string{
 			"report_id":      ticket,
-			"inventory_id":   invDiambil.ID.String(),
+			"inventory_id":   idStr(invDiambil.ID),
 			"recipient_name": "Fakhriza Test",
 			"recipient_npm":  "51421890",
 		},
@@ -270,7 +269,7 @@ func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 		app,
 		map[string]string{
 			"report_id":              ticket,
-			"inventory_id":           invTersimpan.ID.String(),
+			"inventory_id":           idStr(invTersimpan.ID),
 			"recipient_name":         "Fakhriza Test",
 			"recipient_npm":          "51421890",
 			"handover_notes":         "Diserahkan lengkap di Loket D.",
@@ -286,12 +285,12 @@ func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 	var handoverResp struct {
 		Data struct {
 			Handover struct {
-				ID               uuid.UUID `json:"id"`
-				ReportID         uuid.UUID `json:"report_id"`
-				TicketCode       string    `json:"ticket_code"`
-				InventoryID      uuid.UUID `json:"inventory_id"`
-				HasHandoverProof bool      `json:"has_handover_proof"`
-				ProofSHA256      string    `json:"proof_sha256"`
+				ID               uint   `json:"id"`
+				ReportID         uint   `json:"report_id"`
+				TicketCode       string `json:"ticket_code"`
+				InventoryID      uint   `json:"inventory_id"`
+				HasHandoverProof bool   `json:"has_handover_proof"`
+				ProofSHA256      string `json:"proof_sha256"`
 			} `json:"handover"`
 			ReportStatus    string `json:"report_status"`
 			InventoryStatus string `json:"inventory_status"`
@@ -342,7 +341,7 @@ func TestHandoverPrerequisitesSuccessAndPrivateProofStream(t *testing.T) {
 		app,
 		map[string]string{
 			"report_id":      ticket,
-			"inventory_id":   invTersimpan.ID.String(),
+			"inventory_id":   idStr(invTersimpan.ID),
 			"recipient_name": "Fakhriza Test",
 			"recipient_npm":  "51421890",
 		},
@@ -393,7 +392,7 @@ func TestHandoverTransactionRollbackAtomicity(t *testing.T) {
 		app,
 		map[string]string{
 			"report_id":      ticket,
-			"inventory_id":   inv.ID.String(),
+			"inventory_id":   idStr(inv.ID),
 			"recipient_name": "Fakhriza Test",
 			"recipient_npm":  "51421890",
 		},
@@ -429,7 +428,7 @@ func TestAuditLogRBACReadOnlyAndFiltering(t *testing.T) {
 	cfg, db, app, _, _ := setupHandoverAuditTestEnv(t, nil)
 
 	// Insert a system audit log (AdminID = nil) and clean up in t.Cleanup
-	sysTargetID := uuid.New()
+	sysTargetID := uint(987654321)
 	sysLog := models.AuditLog{
 		AdminID:     nil,
 		Action:      "SYSTEM_TEST_MARKER",
@@ -458,7 +457,7 @@ func TestAuditLogRBACReadOnlyAndFiltering(t *testing.T) {
 	assert.Contains(t, errEnv.Error.Message, "Petugas Loket")
 	assert.Contains(t, errEnv.Error.Message, "audit_logs.read")
 
-	resp, _ = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/"+sysLog.ID.String(), nil, petugasHeaders)
+	resp, _ = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/"+idStr(sysLog.ID), nil, petugasHeaders)
 	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
 
 	// 3. Admin -> 200 with filters (action, target_table, admin_id=system, target_id, date range, search)
@@ -468,7 +467,7 @@ func TestAuditLogRBACReadOnlyAndFiltering(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	filterPath := fmt.Sprintf(
 		"/api/v1/admin/audit-logs?action=SYSTEM_TEST_MARKER&target_table=reports&admin_id=system&target_id=%s&date_from=%s&date_to=%s&search=SYSTEM_TEST_MARKER",
-		sysTargetID.String(), today, today,
+		idStr(sysTargetID), today, today,
 	)
 	resp, body = doJSONRequest(t, app, "GET", filterPath, nil, adminHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
@@ -476,12 +475,12 @@ func TestAuditLogRBACReadOnlyAndFiltering(t *testing.T) {
 
 	var listResp struct {
 		Data []struct {
-			ID          uuid.UUID  `json:"id"`
-			AdminID     *uuid.UUID `json:"admin_id"`
-			ActorName   string     `json:"actor_name"`
-			Action      string     `json:"action"`
-			TargetTable string     `json:"target_table"`
-			TargetID    uuid.UUID  `json:"target_id"`
+			ID          uint   `json:"id"`
+			AdminID     *uint  `json:"admin_id"`
+			ActorName   string `json:"actor_name"`
+			Action      string `json:"action"`
+			TargetTable string `json:"target_table"`
+			TargetID    uint   `json:"target_id"`
 		} `json:"data"`
 		Meta struct {
 			Total int64 `json:"total"`
@@ -498,17 +497,17 @@ func TestAuditLogRBACReadOnlyAndFiltering(t *testing.T) {
 	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs?search=Administrator&action=AUTH_LOGIN_SUCCESS", nil, adminHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
 
-	// 4. GetByID: 200 valid, 400 invalid UUID, 404 not found
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/"+sysLog.ID.String(), nil, adminHeaders)
+	// 4. GetByID: 200 valid, 400 invalid ID, 404 not found
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/"+idStr(sysLog.ID), nil, adminHeaders)
 	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
 
 	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/not-a-uuid", nil, adminHeaders)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
-	assert.Equal(t, "INVALID_UUID", errEnv.Error.Code)
+	assert.Equal(t, "INVALID_ID", errEnv.Error.Code)
 
-	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/"+uuid.NewString(), nil, adminHeaders)
+	resp, body = doJSONRequest(t, app, "GET", "/api/v1/admin/audit-logs/999999999", nil, adminHeaders)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
@@ -526,7 +525,7 @@ func TestAuditLogRBACReadOnlyAndFiltering(t *testing.T) {
 
 	// 6. Immutability: PUT, PATCH, DELETE must be disallowed and entry stays intact
 	for _, method := range []string{"PUT", "PATCH", "DELETE"} {
-		r, _ := doJSONRequest(t, app, method, "/api/v1/admin/audit-logs/"+sysLog.ID.String(), []byte(`{}`), adminHeaders)
+		r, _ := doJSONRequest(t, app, method, "/api/v1/admin/audit-logs/"+idStr(sysLog.ID), []byte(`{}`), adminHeaders)
 		assert.Contains(t, []int{fiber.StatusMethodNotAllowed, fiber.StatusNotFound}, r.StatusCode, "%s must not modify audit logs", method)
 	}
 
