@@ -247,6 +247,52 @@ func TestPublicReportSubmitSuccessAndUploadSecurity(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "FILE_TOO_LARGE", errEnv.Error.Code)
 	assert.Equal(t, 3, countFilesInDir(t, uploadDir))
+
+	// 9. Reopen token flow (?reopen=<token>): validate GET /api/v1/reports/reopen/:token and single-use submit
+	reopenTok := "tok-reopen-test-" + submitResp1.Data.TicketCode
+	exp := time.Now().Add(24 * time.Hour)
+	cancelFrom := models.ReportStatusDitolak
+	cancelReason := "Pelapor Melengkapi Ciri Khusus"
+	require.NoError(t, db.Model(&models.Report{}).Where("id = ?", savedReport1.ID).Updates(map[string]interface{}{
+		"status":                    models.ReportStatusDibatalkan,
+		"cancelled_from":            cancelFrom,
+		"cancel_reason":             cancelReason,
+		"resubmit_token":            reopenTok,
+		"resubmit_token_expires_at": exp,
+	}).Error)
+
+	respReopen, bodyReopen := doJSONRequest(t, app, "GET", "/api/v1/reports/reopen/"+reopenTok, nil, nil)
+	require.Equal(t, fiber.StatusOK, respReopen.StatusCode, string(bodyReopen))
+	assert.Contains(t, string(bodyReopen), submitResp1.Data.TicketCode)
+	assert.Contains(t, string(bodyReopen), "Pelapor Melengkapi Ciri Khusus")
+	assert.NotContains(t, string(bodyReopen), "secret_traits")
+
+	reopenFields := defaultReportFormFields()
+	reopenFields["reopen_token"] = reopenTok
+	status, body = doMultipartReportRequest(t, app, reopenFields, []multipartFileSpec{
+		{fieldName: "ktm_krs", fileName: "ktm.png", content: validPNGBytes()},
+	})
+	require.Equal(t, fiber.StatusCreated, status, string(body))
+	var submitResp3 struct {
+		Data struct {
+			TicketCode         string  `json:"ticket_code"`
+			ReopenedFromTicket *string `json:"reopened_from_ticket"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(body, &submitResp3))
+	createdTickets = append(createdTickets, submitResp3.Data.TicketCode)
+	require.NotNil(t, submitResp3.Data.ReopenedFromTicket)
+	assert.Equal(t, submitResp1.Data.TicketCode, *submitResp3.Data.ReopenedFromTicket)
+	t.Cleanup(func() {
+		_ = db.Where("action = ? AND payload->>'ticket_code' = ?", "REPORT_REOPENED", submitResp3.Data.TicketCode).Delete(&models.AuditLog{}).Error
+	})
+
+	// Second attempt to validate or reuse the same reopen_token must fail with 410 REOPEN_TOKEN_USED
+	respReopenUsed, bodyReopenUsed := doJSONRequest(t, app, "GET", "/api/v1/reports/reopen/"+reopenTok, nil, nil)
+	assert.Equal(t, fiber.StatusGone, respReopenUsed.StatusCode)
+	errEnv = apiErrorEnvelope{}
+	require.NoError(t, json.Unmarshal(bodyReopenUsed, &errEnv))
+	assert.Equal(t, "REOPEN_TOKEN_USED", errEnv.Error.Code)
 }
 
 func TestPublicReportTrackingAntiIDORAndDataMinimization(t *testing.T) {

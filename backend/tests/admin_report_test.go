@@ -468,20 +468,55 @@ func TestAdminReportStatusTransitionsNotesAndEmails(t *testing.T) {
 	var rejectedAudit models.AuditLog
 	require.NoError(t, db.Where("action = ? AND target_id = ?", "REPORT_REJECTED", rep1.ID).First(&rejectedAudit).Error)
 
-	// 8. Cannot transition out of Ditolak -> 422 INVALID_STATUS_TRANSITION
+	// 8. Cannot transition directly Ditolak -> Belum Ada -> 422 INVALID_STATUS_TRANSITION
 	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", reopenPayload, authHeaders)
 	assert.Equal(t, fiber.StatusUnprocessableEntity, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "INVALID_STATUS_TRANSITION", errEnv.Error.Code)
 
-	// 9. Cannot transition out of Selesai -> 409 REPORT_ALREADY_COMPLETED
-	require.NoError(t, db.Model(&models.Report{}).Where("id = ?", rep1.ID).Update("status", models.ReportStatusSelesai).Error)
-	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", cancelPayload, authHeaders)
+	// 8b. Transition Ditolak -> Dibatalkan with cancel_reason -> 200 OK + RESUBMIT_INVITATION email + resubmit_link
+	cancelRejectedPayload, _ := json.Marshal(map[string]interface{}{
+		"status":                models.ReportStatusDibatalkan,
+		"cancel_reason":         "Pelapor Melengkapi Ciri Khusus",
+		"include_resubmit_link": true,
+	})
+	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", cancelRejectedPayload, authHeaders)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
+
+	resubmitEmail := spy.waitNextEmail(t)
+	assert.Equal(t, "RESUBMIT_INVITATION", resubmitEmail.EventType)
+	assert.Contains(t, resubmitEmail.Body, "/lapor?reopen=")
+	assert.Contains(t, resubmitEmail.Body, "Pelapor Melengkapi Ciri Khusus")
+
+	// 9. Cannot transition Selesai -> Belum Ada -> 409 REPORT_ALREADY_COMPLETED
+	require.NoError(t, db.Model(&models.Report{}).Where("id = ?", rep1.ID).Updates(map[string]interface{}{
+		"status":               models.ReportStatusSelesai,
+		"matched_inventory_id": invDiambil.ID,
+	}).Error)
+	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", reopenPayload, authHeaders)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "REPORT_ALREADY_COMPLETED", errEnv.Error.Code)
+
+	// 9b. Transition Selesai -> Dibatalkan with cancel_reason & restore_inventory=true -> 200 OK + restores inventory to Tersimpan + ERROR_CLARIFICATION email
+	voidCompletedPayload, _ := json.Marshal(map[string]interface{}{
+		"status":                models.ReportStatusDibatalkan,
+		"cancel_reason":         "Petugas Keliru Pilih Tiket",
+		"restore_inventory":     true,
+		"include_resubmit_link": true,
+	})
+	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/reports/"+ticket1+"/status", voidCompletedPayload, authHeaders)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
+
+	clarificationEmail := spy.waitNextEmail(t)
+	assert.Equal(t, "ERROR_CLARIFICATION", clarificationEmail.EventType)
+	assert.Contains(t, clarificationEmail.Body, "Petugas Keliru Pilih Tiket")
+
+	var restoredInv models.Inventory
+	require.NoError(t, db.Where("id = ?", invDiambil.ID).First(&restoredInv).Error)
+	assert.Equal(t, models.InventoryStatusTersimpan, restoredInv.Status)
 }
 
 func TestAdminReportPrivateFileStreamingAndSecurity(t *testing.T) {

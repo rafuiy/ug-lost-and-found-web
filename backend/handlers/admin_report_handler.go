@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,7 +22,6 @@ import (
 	"backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -54,26 +54,45 @@ var allowedStatusTransitions = map[string]map[string]bool{
 		models.ReportStatusDitolak:    true,
 		models.ReportStatusDibatalkan: true,
 	},
+	models.ReportStatusDitolak: {
+		models.ReportStatusDibatalkan: true,
+	},
+	models.ReportStatusSelesai: {
+		models.ReportStatusDibatalkan: true,
+	},
 	models.ReportStatusDibatalkan: {
 		models.ReportStatusBelumAda: true,
 	},
 }
 
 type AdminReportListItem struct {
-	ID                 uuid.UUID  `json:"id"`
-	TicketCode         string     `json:"ticket_code"`
-	ReporterName       string     `json:"reporter_name"`
-	NPM                string     `json:"npm"`
-	ItemName           string     `json:"item_name"`
-	LossLocation       string     `json:"loss_location"`
-	LossDatetime       time.Time  `json:"loss_datetime"`
-	Status             string     `json:"status"`
-	IsStale            bool       `json:"is_stale"`
-	MatchedInventoryID *uuid.UUID `json:"matched_inventory_id"`
-	HasKtmKrs          bool       `json:"has_ktm_krs"`
-	HasItemImage       bool       `json:"has_item_image"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 uuid.UUID         `json:"id"`
+	TicketCode         string            `json:"ticket_code"`
+	ReporterName       string            `json:"reporter_name"`
+	ReporterEmail      string            `json:"reporter_email"`
+	NPM                string            `json:"npm"`
+	PhoneNumber        string            `json:"phone_number"`
+	ItemName           string            `json:"item_name"`
+	Category           string            `json:"category"`
+	LossLocation       string            `json:"loss_location"`
+	LossDatetime       time.Time         `json:"loss_datetime"`
+	ItemDescription    string            `json:"item_description"`
+	Status             string            `json:"status"`
+	IsStale            bool              `json:"is_stale"`
+	AdminNotes         *string           `json:"admin_notes"`
+	RejectionReason    *string           `json:"rejection_reason"`
+	CancelledFrom      *string           `json:"cancelled_from,omitempty"`
+	CancelledBy        *string           `json:"cancelled_by,omitempty"`
+	CancelReason       *string           `json:"cancel_reason,omitempty"`
+	CancelEmailType    *string           `json:"cancel_email_type,omitempty"`
+	ResubmitLink       *string           `json:"resubmit_link,omitempty"`
+	ReopenedFromTicket *string           `json:"reopened_from_ticket,omitempty"`
+	MatchedInventoryID *uuid.UUID        `json:"matched_inventory_id"`
+	MatchedInventory   *models.Inventory `json:"matched_inventory,omitempty"`
+	HasKtmKrs          bool              `json:"has_ktm_krs"`
+	HasItemImage       bool              `json:"has_item_image"`
+	CreatedAt          time.Time         `json:"created_at"`
+	UpdatedAt          time.Time         `json:"updated_at"`
 }
 
 type AdminReportStats struct {
@@ -108,6 +127,7 @@ type AdminReportDetail struct {
 	NPM                string              `json:"npm"`
 	PhoneNumber        string              `json:"phone_number"`
 	ItemName           string              `json:"item_name"`
+	Category           string              `json:"category"`
 	LossLocation       string              `json:"loss_location"`
 	LossDatetime       time.Time           `json:"loss_datetime"`
 	ItemDescription    string              `json:"item_description"`
@@ -117,6 +137,12 @@ type AdminReportDetail struct {
 	RestoredAt         *time.Time          `json:"restored_at"`
 	AdminNotes         *string             `json:"admin_notes"`
 	RejectionReason    *string             `json:"rejection_reason"`
+	CancelledFrom      *string             `json:"cancelled_from,omitempty"`
+	CancelledBy        *string             `json:"cancelled_by,omitempty"`
+	CancelReason       *string             `json:"cancel_reason,omitempty"`
+	CancelEmailType    *string             `json:"cancel_email_type,omitempty"`
+	ResubmitLink       *string             `json:"resubmit_link,omitempty"`
+	ReopenedFromTicket *string             `json:"reopened_from_ticket,omitempty"`
 	MatchedInventoryID *uuid.UUID          `json:"matched_inventory_id"`
 	MatchedInventory   *models.Inventory   `json:"matched_inventory,omitempty"`
 	Handover           *models.Handover    `json:"handover,omitempty"`
@@ -132,10 +158,13 @@ type EmailNotificationInfo struct {
 }
 
 type UpdateReportStatusRequest struct {
-	Status             string  `json:"status"`
-	AdminNotes         *string `json:"admin_notes"`
-	RejectionReason    *string `json:"rejection_reason"`
-	MatchedInventoryID *string `json:"matched_inventory_id"`
+	Status              string  `json:"status"`
+	AdminNotes          *string `json:"admin_notes"`
+	RejectionReason     *string `json:"rejection_reason"`
+	MatchedInventoryID  *string `json:"matched_inventory_id"`
+	CancelReason        *string `json:"cancel_reason"`
+	RestoreInventory    *bool   `json:"restore_inventory"`
+	IncludeResubmitLink *bool   `json:"include_resubmit_link"`
 }
 
 type UpdateReportNotesRequest struct {
@@ -263,6 +292,9 @@ func (h *AdminReportHandler) List(c *fiber.Ctx) error {
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
+	if category := strings.TrimSpace(c.Query("category")); category != "" {
+		query = query.Where("category ILIKE ?", "%"+category+"%")
+	}
 	if isStalePtr != nil {
 		query = query.Where("is_stale = ?", *isStalePtr)
 	}
@@ -275,8 +307,8 @@ func (h *AdminReportHandler) List(c *fiber.Ctx) error {
 	if search := strings.TrimSpace(c.Query("search")); search != "" {
 		like := "%" + search + "%"
 		query = query.Where(
-			"(ticket_code ILIKE ? OR reporter_name ILIKE ? OR npm ILIKE ? OR item_name ILIKE ? OR loss_location ILIKE ?)",
-			like, like, like, like, like,
+			"(ticket_code ILIKE ? OR reporter_name ILIKE ? OR npm ILIKE ? OR item_name ILIKE ? OR category ILIKE ? OR loss_location ILIKE ?)",
+			like, like, like, like, like, like,
 		)
 	}
 
@@ -287,23 +319,37 @@ func (h *AdminReportHandler) List(c *fiber.Ctx) error {
 
 	var rows []models.Report
 	offset := (page - 1) * limit
-	if err := query.Order(sortCol + " " + strings.ToUpper(orderDir)).Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
+	if err := query.Preload("MatchedInventory").Order(sortCol + " " + strings.ToUpper(orderDir)).Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
 		return utils.SendError(c, fiber.StatusInternalServerError, "DB_QUERY_ERROR", "Gagal memuat daftar laporan dari database.", nil)
 	}
 
 	items := make([]AdminReportListItem, 0, len(rows))
 	for _, r := range rows {
+		rCopy := r
 		items = append(items, AdminReportListItem{
 			ID:                 r.ID,
 			TicketCode:         r.TicketCode,
 			ReporterName:       r.ReporterName,
+			ReporterEmail:      r.ReporterEmail,
 			NPM:                r.NPM,
+			PhoneNumber:        r.PhoneNumber,
 			ItemName:           r.ItemName,
+			Category:           resolveReportCategory(&rCopy),
 			LossLocation:       r.LossLocation,
 			LossDatetime:       r.LossDatetime,
+			ItemDescription:    r.ItemDescription,
 			Status:             r.Status,
 			IsStale:            r.IsStale,
+			AdminNotes:         r.AdminNotes,
+			RejectionReason:    r.RejectionReason,
+			CancelledFrom:      r.CancelledFrom,
+			CancelledBy:        r.CancelledBy,
+			CancelReason:       r.CancelReason,
+			CancelEmailType:    r.CancelEmailType,
+			ResubmitLink:       buildResubmitLink(h.Cfg, &rCopy),
+			ReopenedFromTicket: r.ReopenedFromTicket,
 			MatchedInventoryID: r.MatchedInventoryID,
+			MatchedInventory:   r.MatchedInventory,
 			HasKtmKrs:          r.KtmKrsPath != "",
 			HasItemImage:       r.ItemImagePath != nil && strings.TrimSpace(*r.ItemImagePath) != "",
 			CreatedAt:          r.CreatedAt,
@@ -344,7 +390,7 @@ func (h *AdminReportHandler) GetDetail(c *fiber.Ctx) error {
 		return utils.SendError(c, fiber.StatusInternalServerError, "DB_QUERY_ERROR", "Gagal mengambil detail laporan dari database.", nil)
 	}
 
-	return utils.SendSuccess(c, fiber.StatusOK, buildAdminReportDetail(&report))
+	return utils.SendSuccess(c, fiber.StatusOK, buildAdminReportDetail(h.Cfg, &report))
 }
 
 // UpdateStatus enforces the report status state machine, logs audit history, and dispatches async notifications.
@@ -399,6 +445,26 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 		)
 	}
 
+	var trimmedCancelReason string
+	if req.CancelReason != nil {
+		trimmedCancelReason = strings.TrimSpace(*req.CancelReason)
+	}
+	if trimmedCancelReason == "" && trimmedRejectionReason != "" {
+		trimmedCancelReason = trimmedRejectionReason
+	}
+	if trimmedCancelReason == "" && req.AdminNotes != nil {
+		trimmedCancelReason = strings.TrimSpace(*req.AdminNotes)
+	}
+
+	restoreInventory := true
+	if req.RestoreInventory != nil {
+		restoreInventory = *req.RestoreInventory
+	}
+	includeResubmitLink := true
+	if req.IncludeResubmitLink != nil {
+		includeResubmitLink = *req.IncludeResubmitLink
+	}
+
 	var parsedMatchedInvID *uuid.UUID
 	clearMatchedInv := false
 	if req.MatchedInventoryID != nil {
@@ -451,11 +517,11 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 		}
 
 		prevStatus = report.Status
-		if report.Status == models.ReportStatusSelesai {
+		if report.Status == models.ReportStatusSelesai && targetStatus != models.ReportStatusDibatalkan {
 			return &utils.AppError{
 				Status:  fiber.StatusConflict,
 				Code:    "REPORT_ALREADY_COMPLETED",
-				Message: "Laporan yang sudah berstatus 'Selesai' bersifat final dan tidak dapat diubah statusnya.",
+				Message: "Laporan yang sudah berstatus 'Selesai' hanya dapat dibatalkan ke status 'Dibatalkan' dengan alasan koreksi.",
 			}
 		}
 
@@ -468,9 +534,21 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 			}
 		}
 
+		if targetStatus == models.ReportStatusDibatalkan &&
+			(prevStatus == models.ReportStatusDitolak || prevStatus == models.ReportStatusSelesai) &&
+			trimmedCancelReason == "" {
+			return &utils.AppError{
+				Status:  fiber.StatusUnprocessableEntity,
+				Code:    "VALIDATION_ERROR",
+				Message: fmt.Sprintf("Alasan pembatalan wajib diisi saat membatalkan laporan dari status '%s'.", prevStatus),
+				Fields:  map[string]string{"cancel_reason": "Alasan pembatalan status wajib diisi."},
+			}
+		}
+
+		now := time.Now()
 		updates := map[string]interface{}{
 			"status":     targetStatus,
-			"updated_at": time.Now(),
+			"updated_at": now,
 		}
 
 		if parsedMatchedInvID != nil {
@@ -510,6 +588,67 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 			updates["rejection_reason"] = trimmedRejectionReason
 		}
 
+		if targetStatus == models.ReportStatusDibatalkan {
+			var actingAdmin models.Admin
+			actorLabel := "Petugas Loket"
+			if err := tx.Where("id = ?", adminID).First(&actingAdmin).Error; err == nil {
+				actorLabel = fmt.Sprintf("%s (%s)", actingAdmin.Name, actingAdmin.Username)
+			}
+
+			updates["cancelled_from"] = prevStatus
+			updates["cancelled_by"] = actorLabel
+			if trimmedCancelReason != "" {
+				updates["cancel_reason"] = trimmedCancelReason
+			}
+
+			switch prevStatus {
+			case models.ReportStatusDitolak:
+				updates["cancel_email_type"] = "RESUBMIT_INVITATION"
+				token, genErr := utils.GenerateResubmitToken()
+				if genErr != nil {
+					return genErr
+				}
+				expiresAt := now.Add(7 * 24 * time.Hour)
+				updates["resubmit_token"] = token
+				updates["resubmit_token_expires_at"] = expiresAt
+				updates["resubmit_token_used_at"] = nil
+
+			case models.ReportStatusSelesai:
+				updates["cancel_email_type"] = "ERROR_CLARIFICATION"
+				if includeResubmitLink {
+					token, genErr := utils.GenerateResubmitToken()
+					if genErr != nil {
+						return genErr
+					}
+					expiresAt := now.Add(7 * 24 * time.Hour)
+					updates["resubmit_token"] = token
+					updates["resubmit_token_expires_at"] = expiresAt
+					updates["resubmit_token_used_at"] = nil
+				} else {
+					updates["resubmit_token"] = nil
+					updates["resubmit_token_expires_at"] = nil
+					updates["resubmit_token_used_at"] = nil
+				}
+
+				if err := tx.Model(&models.Handover{}).Where("report_id = ?", report.ID).Updates(map[string]interface{}{
+					"voided_at":   now,
+					"voided_by":   adminID,
+					"void_reason": trimmedCancelReason,
+				}).Error; err != nil {
+					return err
+				}
+
+				if restoreInventory && report.MatchedInventoryID != nil {
+					if err := tx.Model(&models.Inventory{}).Where("id = ?", *report.MatchedInventoryID).Updates(map[string]interface{}{
+						"status":     models.InventoryStatusTersimpan,
+						"updated_at": now,
+					}).Error; err != nil {
+						return err
+					}
+				}
+			}
+		}
+
 		if err := tx.Model(&models.Report{}).Where("id = ?", report.ID).Updates(updates).Error; err != nil {
 			return err
 		}
@@ -521,6 +660,10 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 		auditAction := "REPORT_STATUS_UPDATED"
 		if targetStatus == models.ReportStatusDitolak {
 			auditAction = "REPORT_REJECTED"
+		} else if targetStatus == models.ReportStatusDibatalkan && prevStatus == models.ReportStatusSelesai {
+			auditAction = "HANDOVER_VOID"
+		} else if targetStatus == models.ReportStatusDibatalkan && prevStatus == models.ReportStatusDitolak {
+			auditAction = "STATUS_REVERT"
 		}
 
 		return utils.RecordAuditLog(
@@ -530,11 +673,14 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 			"reports",
 			updated.ID,
 			map[string]interface{}{
-				"ticket_code":          updated.TicketCode,
-				"previous_status":      prevStatus,
-				"new_status":           updated.Status,
-				"matched_inventory_id": updated.MatchedInventoryID,
-				"has_rejection_reason": targetStatus == models.ReportStatusDitolak,
+				"ticket_code":           updated.TicketCode,
+				"previous_status":       prevStatus,
+				"new_status":            updated.Status,
+				"matched_inventory_id":  updated.MatchedInventoryID,
+				"has_rejection_reason":  targetStatus == models.ReportStatusDitolak,
+				"cancel_reason":         trimmedCancelReason,
+				"restore_inventory":     restoreInventory,
+				"include_resubmit_link": includeResubmitLink,
 			},
 			c.IP(),
 		)
@@ -567,11 +713,33 @@ func (h *AdminReportHandler) UpdateStatus(c *fiber.Ctx) error {
 				EventType: msg.EventType,
 				Recipient: updated.ReporterEmail,
 			}
+		case models.ReportStatusDibatalkan:
+			resubmitURL := ""
+			if linkPtr := buildResubmitLink(h.Cfg, &updated); linkPtr != nil {
+				resubmitURL = *linkPtr
+			}
+			if prevStatus == models.ReportStatusDitolak {
+				msg := services.BuildResubmitInvitationEmail(h.Cfg, &updated, trimmedCancelReason, resubmitURL)
+				h.Email.SendAsync(msg)
+				emailInfo = EmailNotificationInfo{
+					Queued:    true,
+					EventType: msg.EventType,
+					Recipient: updated.ReporterEmail,
+				}
+			} else if prevStatus == models.ReportStatusSelesai {
+				msg := services.BuildErrorClarificationEmail(h.Cfg, &updated, trimmedCancelReason, resubmitURL, restoreInventory)
+				h.Email.SendAsync(msg)
+				emailInfo = EmailNotificationInfo{
+					Queued:    true,
+					EventType: msg.EventType,
+					Recipient: updated.ReporterEmail,
+				}
+			}
 		}
 	}
 
 	return utils.SendSuccess(c, fiber.StatusOK, fiber.Map{
-		"report":             buildAdminReportDetail(&updated),
+		"report":             buildAdminReportDetail(h.Cfg, &updated),
 		"email_notification": emailInfo,
 	})
 }
@@ -710,7 +878,7 @@ func (h *AdminReportHandler) UpdateNotes(c *fiber.Ctx) error {
 		return utils.SendError(c, fiber.StatusInternalServerError, "REPORT_NOTES_UPDATE_FAILED", "Gagal memperbarui catatan laporan di database.", nil)
 	}
 
-	return utils.SendSuccess(c, fiber.StatusOK, buildAdminReportDetail(&updated))
+	return utils.SendSuccess(c, fiber.StatusOK, buildAdminReportDetail(h.Cfg, &updated))
 }
 
 // Restore recovers a stale 'Belum Ada' report back to the active queue and records an audit log.
@@ -813,7 +981,7 @@ func (h *AdminReportHandler) Restore(c *fiber.Ctx) error {
 		return utils.SendError(c, fiber.StatusInternalServerError, "REPORT_RESTORE_FAILED", "Gagal memulihkan laporan lawas di database.", nil)
 	}
 
-	return utils.SendSuccess(c, fiber.StatusOK, buildAdminReportDetail(&updated))
+	return utils.SendSuccess(c, fiber.StatusOK, buildAdminReportDetail(h.Cfg, &updated))
 }
 
 // StreamPrivateFile securely streams a private document after authorization, traversal checks, and audit logging.
@@ -944,7 +1112,7 @@ func applyReportIdentifierScope(db *gorm.DB, rawID string) (*gorm.DB, *utils.App
 	}
 }
 
-func buildAdminReportDetail(r *models.Report) AdminReportDetail {
+func buildAdminReportDetail(cfg *config.AppConfig, r *models.Report) AdminReportDetail {
 	return AdminReportDetail{
 		ID:                 r.ID,
 		TicketCode:         r.TicketCode,
@@ -953,6 +1121,7 @@ func buildAdminReportDetail(r *models.Report) AdminReportDetail {
 		NPM:                r.NPM,
 		PhoneNumber:        r.PhoneNumber,
 		ItemName:           r.ItemName,
+		Category:           resolveReportCategory(r),
 		LossLocation:       r.LossLocation,
 		LossDatetime:       r.LossDatetime,
 		ItemDescription:    r.ItemDescription,
@@ -962,6 +1131,12 @@ func buildAdminReportDetail(r *models.Report) AdminReportDetail {
 		RestoredAt:         r.RestoredAt,
 		AdminNotes:         r.AdminNotes,
 		RejectionReason:    r.RejectionReason,
+		CancelledFrom:      r.CancelledFrom,
+		CancelledBy:        r.CancelledBy,
+		CancelReason:       r.CancelReason,
+		CancelEmailType:    r.CancelEmailType,
+		ResubmitLink:       buildResubmitLink(cfg, r),
+		ReopenedFromTicket: r.ReopenedFromTicket,
 		MatchedInventoryID: r.MatchedInventoryID,
 		MatchedInventory:   r.MatchedInventory,
 		Handover:           r.Handover,
@@ -973,6 +1148,39 @@ func buildAdminReportDetail(r *models.Report) AdminReportDetail {
 		CreatedAt: r.CreatedAt,
 		UpdatedAt: r.UpdatedAt,
 	}
+}
+
+func resolveReportCategory(r *models.Report) string {
+	if r == nil {
+		return "Lainnya"
+	}
+	cat := strings.TrimSpace(r.Category)
+	if cat != "" && cat != "Lainnya" {
+		return cat
+	}
+	if r.MatchedInventory != nil && strings.TrimSpace(r.MatchedInventory.InternalCategory) != "" {
+		return strings.TrimSpace(r.MatchedInventory.InternalCategory)
+	}
+	if cat != "" {
+		return cat
+	}
+	return utils.InferItemCategory(r.ItemName, r.ItemDescription)
+}
+
+func buildResubmitLink(cfg *config.AppConfig, r *models.Report) *string {
+	if r == nil || r.ResubmitToken == nil {
+		return nil
+	}
+	token := strings.TrimSpace(*r.ResubmitToken)
+	if token == "" || r.ResubmitTokenUsedAt != nil {
+		return nil
+	}
+	path := "/lapor?reopen=" + token
+	if cfg != nil && strings.TrimSpace(cfg.PublicAppURL) != "" {
+		full := strings.TrimRight(strings.TrimSpace(cfg.PublicAppURL), "/") + path
+		return &full
+	}
+	return &path
 }
 
 func parseFilterDate(raw string, endOfDay bool) (time.Time, error) {

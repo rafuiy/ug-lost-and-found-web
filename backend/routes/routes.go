@@ -107,6 +107,7 @@ func SetupRoutes(app *fiber.App, cfg *config.AppConfig, opt AppOptions) {
 	reportHandler := handlers.NewReportHandler(cfg, opt.EmailSender)
 	v1.Post("/reports", middlewares.ReportSubmitRateLimiter(opt.ReportSubmitRateLimitMax, opt.ReportSubmitRateLimitWindow), reportHandler.SubmitReport)
 	v1.Post("/reports/track", middlewares.ReportTrackRateLimiter(opt.ReportTrackRateLimitMax, opt.ReportTrackRateLimitWindow), reportHandler.TrackReport)
+	v1.Get("/reports/reopen/:token", middlewares.ReportTrackRateLimiter(opt.ReportTrackRateLimitMax, opt.ReportTrackRateLimitWindow), reportHandler.ValidateReopenToken)
 
 	// Protected admin endpoints (JWT + granular permission required)
 	admin := v1.Group("/admin", middlewares.AuthMiddleware(cfg))
@@ -117,6 +118,7 @@ func SetupRoutes(app *fiber.App, cfg *config.AppConfig, opt AppOptions) {
 	inventories.Post("/", middlewares.RequirePermission("inventories.write"), invHandler.Create)
 	inventories.Get("/:id", middlewares.RequirePermission("inventories.read"), invHandler.GetByID)
 	inventories.Patch("/:id", middlewares.RequirePermission("inventories.write"), invHandler.Update)
+	inventories.Delete("/:id", middlewares.RequirePermission("inventories.write"), invHandler.Delete)
 
 	adminReportHandler := handlers.NewAdminReportHandler(cfg, opt.EmailSender)
 	reports := admin.Group("/reports")

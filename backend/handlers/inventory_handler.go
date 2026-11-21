@@ -3,6 +3,8 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,29 +16,39 @@ import (
 	"backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
+var lockerPrefixRegex = regexp.MustCompile(`(?s)^\[(Loker [^\]]+)\]\s*(.*)$`)
+
 type CreateInventoryRequest struct {
-	ItemName         string `json:"item_name"`
-	InternalCategory string `json:"internal_category"`
-	FoundLocation    string `json:"found_location"`
-	FoundDatetime    string `json:"found_datetime"`
-	ItemDetails      string `json:"item_details"`
-	FinderName       string `json:"finder_name"`
-	FinderContact    string `json:"finder_contact"`
+	ItemName         string  `json:"item_name"`
+	InternalCategory string  `json:"internal_category"`
+	StorageLocker    string  `json:"storage_locker"`
+	FoundLocation    string  `json:"found_location"`
+	FoundDatetime    string  `json:"found_datetime"`
+	ItemDetails      string  `json:"item_details"`
+	FinderName       string  `json:"finder_name"`
+	FinderContact    string  `json:"finder_contact"`
+	PhotoURL         *string `json:"photo_url"`
 }
 
 type UpdateInventoryRequest struct {
 	ItemName         *string `json:"item_name"`
 	InternalCategory *string `json:"internal_category"`
+	StorageLocker    *string `json:"storage_locker"`
 	FoundLocation    *string `json:"found_location"`
 	FoundDatetime    *string `json:"found_datetime"`
 	ItemDetails      *string `json:"item_details"`
 	FinderName       *string `json:"finder_name"`
 	FinderContact    *string `json:"finder_contact"`
+	PhotoURL         *string `json:"photo_url"`
+}
+
+type DeleteInventoryRequest struct {
+	Reason    string `json:"reason"`
+	ConfirmID string `json:"confirm_id"`
 }
 
 type PaginationMeta struct {
@@ -120,8 +132,8 @@ func (h *InventoryHandler) List(c *fiber.Ctx) error {
 	if search := strings.TrimSpace(c.Query("search")); search != "" {
 		like := "%" + search + "%"
 		query = query.Where(
-			"(item_name ILIKE ? OR internal_category ILIKE ? OR found_location ILIKE ? OR item_details ILIKE ? OR finder_name ILIKE ?)",
-			like, like, like, like, like,
+			"(item_name ILIKE ? OR internal_category ILIKE ? OR storage_locker ILIKE ? OR found_location ILIKE ? OR item_details ILIKE ? OR finder_name ILIKE ?)",
+			like, like, like, like, like, like,
 		)
 	}
 
@@ -158,14 +170,27 @@ func (h *InventoryHandler) Create(c *fiber.Ctx) error {
 
 	itemName := strings.TrimSpace(req.ItemName)
 	category := strings.TrimSpace(req.InternalCategory)
+	storageLocker := strings.TrimSpace(req.StorageLocker)
 	foundLocation := strings.TrimSpace(req.FoundLocation)
 	itemDetails := strings.TrimSpace(req.ItemDetails)
 	finderName := strings.TrimSpace(req.FinderName)
 	finderContact := strings.TrimSpace(req.FinderContact)
 
+	if storageLocker == "" {
+		if m := lockerPrefixRegex.FindStringSubmatch(itemDetails); len(m) == 3 {
+			storageLocker = strings.TrimSpace(m[1])
+			if cleaned := strings.TrimSpace(m[2]); cleaned != "" {
+				itemDetails = cleaned
+			}
+		} else {
+			storageLocker = "Loker A-01 (Loket D)"
+		}
+	}
+
 	fieldErrors := make(map[string]string)
 	validateRequiredText(fieldErrors, "item_name", itemName, 100, "Nama barang")
 	validateRequiredText(fieldErrors, "internal_category", category, 50, "Kategori internal")
+	validateRequiredText(fieldErrors, "storage_locker", storageLocker, 60, "Lokasi loker penyimpanan")
 	validateRequiredText(fieldErrors, "found_location", foundLocation, 150, "Lokasi ditemukan")
 	validateRequiredText(fieldErrors, "item_details", itemDetails, 0, "Detail fisik barang")
 	validateRequiredText(fieldErrors, "finder_name", finderName, 100, "Nama penemu")
@@ -174,6 +199,13 @@ func (h *InventoryHandler) Create(c *fiber.Ctx) error {
 	foundDatetime, dtErr := utils.ParsePastDateTime(req.FoundDatetime)
 	if dtErr != nil {
 		fieldErrors["found_datetime"] = dtErr.Message
+	}
+
+	var photoURLPtr *string
+	if req.PhotoURL != nil {
+		if trimmedPhoto := strings.TrimSpace(*req.PhotoURL); trimmedPhoto != "" {
+			photoURLPtr = &trimmedPhoto
+		}
 	}
 
 	if len(fieldErrors) > 0 {
@@ -198,11 +230,13 @@ func (h *InventoryHandler) Create(c *fiber.Ctx) error {
 	inv := models.Inventory{
 		ItemName:         itemName,
 		InternalCategory: category,
+		StorageLocker:    storageLocker,
 		FoundLocation:    foundLocation,
 		FoundDatetime:    foundDatetime,
 		ItemDetails:      itemDetails,
 		FinderName:       finderName,
 		FinderContact:    finderContact,
+		PhotoURL:         photoURLPtr,
 		Status:           models.InventoryStatusTersimpan,
 	}
 
@@ -219,6 +253,7 @@ func (h *InventoryHandler) Create(c *fiber.Ctx) error {
 			map[string]interface{}{
 				"item_name":         inv.ItemName,
 				"internal_category": inv.InternalCategory,
+				"storage_locker":    inv.StorageLocker,
 				"found_location":    inv.FoundLocation,
 				"status":            inv.Status,
 			},
@@ -267,11 +302,13 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 
 	if req.ItemName == nil &&
 		req.InternalCategory == nil &&
+		req.StorageLocker == nil &&
 		req.FoundLocation == nil &&
 		req.FoundDatetime == nil &&
 		req.ItemDetails == nil &&
 		req.FinderName == nil &&
-		req.FinderContact == nil {
+		req.FinderContact == nil &&
+		req.PhotoURL == nil {
 		return utils.SendError(
 			c,
 			fiber.StatusUnprocessableEntity,
@@ -294,6 +331,11 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 		validateRequiredText(fieldErrors, "internal_category", val, 50, "Kategori internal")
 		updates["internal_category"] = val
 	}
+	if req.StorageLocker != nil {
+		val := strings.TrimSpace(*req.StorageLocker)
+		validateRequiredText(fieldErrors, "storage_locker", val, 60, "Lokasi loker penyimpanan")
+		updates["storage_locker"] = val
+	}
 	if req.FoundLocation != nil {
 		val := strings.TrimSpace(*req.FoundLocation)
 		validateRequiredText(fieldErrors, "found_location", val, 150, "Lokasi ditemukan")
@@ -301,6 +343,16 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 	}
 	if req.ItemDetails != nil {
 		val := strings.TrimSpace(*req.ItemDetails)
+		if req.StorageLocker == nil {
+			if m := lockerPrefixRegex.FindStringSubmatch(val); len(m) == 3 {
+				if lockerVal := strings.TrimSpace(m[1]); lockerVal != "" && len([]rune(lockerVal)) <= 60 {
+					updates["storage_locker"] = lockerVal
+				}
+				if cleaned := strings.TrimSpace(m[2]); cleaned != "" {
+					val = cleaned
+				}
+			}
+		}
 		validateRequiredText(fieldErrors, "item_details", val, 0, "Detail fisik barang")
 		updates["item_details"] = val
 	}
@@ -313,6 +365,14 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 		val := strings.TrimSpace(*req.FinderContact)
 		validateRequiredText(fieldErrors, "finder_contact", val, 50, "Kontak penemu")
 		updates["finder_contact"] = val
+	}
+	if req.PhotoURL != nil {
+		val := strings.TrimSpace(*req.PhotoURL)
+		if val == "" {
+			updates["photo_url"] = nil
+		} else {
+			updates["photo_url"] = val
+		}
 	}
 	if req.FoundDatetime != nil {
 		parsedDT, dtErr := utils.ParsePastDateTime(*req.FoundDatetime)
@@ -401,6 +461,171 @@ func (h *InventoryHandler) Update(c *fiber.Ctx) error {
 	}
 
 	return utils.SendSuccess(c, fiber.StatusOK, updated)
+}
+
+// Delete soft-deletes a 'Tersimpan' inventory record after case-sensitive ID verification,
+// atomically unlinks any matched reports (reverting 'Perlu Verifikasi' -> 'Belum Ada'), and writes audit logs.
+func (h *InventoryHandler) Delete(c *fiber.Ctx) error {
+	rawID := strings.TrimSpace(c.Params("id"))
+	invID, err := uuid.Parse(rawID)
+	if err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "INVALID_UUID", "Parameter ID inventori tidak valid (harus berupa UUID).", nil)
+	}
+
+	var req DeleteInventoryRequest
+	if appErr := utils.ParseJSONBody(c, &req); appErr != nil {
+		return utils.SendError(c, appErr.Status, appErr.Code, appErr.Message, appErr.Fields)
+	}
+
+	reason := strings.TrimSpace(req.Reason)
+	confirmID := strings.TrimSpace(req.ConfirmID)
+
+	fieldErrors := make(map[string]string)
+	if reason == "" {
+		fieldErrors["reason"] = "Alasan penghapusan inventori wajib diisi."
+	}
+	if confirmID == "" {
+		fieldErrors["confirm_id"] = "Konfirmasi ID inventori wajib diisi."
+	} else if confirmID != rawID {
+		fieldErrors["confirm_id"] = fmt.Sprintf("Konfirmasi ID inventori harus sama persis dengan '%s' (case-sensitive).", rawID)
+	}
+
+	if len(fieldErrors) > 0 {
+		return utils.SendError(
+			c,
+			fiber.StatusUnprocessableEntity,
+			"VALIDATION_ERROR",
+			"Verifikasi penghapusan inventori gagal. Periksa alasan dan konfirmasi ID.",
+			fieldErrors,
+		)
+	}
+
+	adminID, ok := c.Locals(middlewares.LocalAdminID).(uuid.UUID)
+	if !ok || adminID == uuid.Nil {
+		return utils.SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "Sesi admin tidak valid. Silakan login kembali.", nil)
+	}
+
+	if config.DB == nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "DB_NOT_INITIALIZED", "Koneksi database belum siap.", nil)
+	}
+
+	var unlinkedTickets []string
+	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+		var existing models.Inventory
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", invID).First(&existing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return &utils.AppError{
+					Status:  fiber.StatusNotFound,
+					Code:    "INVENTORY_NOT_FOUND",
+					Message: "Data inventori tidak ditemukan atau sudah dihapus.",
+				}
+			}
+			return err
+		}
+
+		if existing.Status == models.InventoryStatusDiambil {
+			return &utils.AppError{
+				Status:  fiber.StatusConflict,
+				Code:    "INVENTORY_ALREADY_CLAIMED",
+				Message: "Inventori yang sudah berstatus 'Diambil' tidak dapat dihapus agar histori serah terima tetap utuh.",
+			}
+		}
+
+		now := time.Now()
+		var linkedReports []models.Report
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("matched_inventory_id = ?", invID).Find(&linkedReports).Error; err != nil {
+			return err
+		}
+
+		for _, rep := range linkedReports {
+			unlinkedTickets = append(unlinkedTickets, rep.TicketCode)
+			repUpdates := map[string]interface{}{
+				"matched_inventory_id": nil,
+				"updated_at":           now,
+			}
+			prevRepStatus := rep.Status
+			newRepStatus := rep.Status
+			if rep.Status == models.ReportStatusPerluVerifikasi {
+				newRepStatus = models.ReportStatusBelumAda
+				repUpdates["status"] = newRepStatus
+				noteAddition := fmt.Sprintf("Tautan inventori [%s] dilepas karena inventori dihapus (%s) — status dikembalikan ke Belum Ada.", invID.String(), reason)
+				if rep.AdminNotes != nil && strings.TrimSpace(*rep.AdminNotes) != "" {
+					repUpdates["admin_notes"] = strings.TrimSpace(*rep.AdminNotes) + " | " + noteAddition
+				} else {
+					repUpdates["admin_notes"] = noteAddition
+				}
+			}
+
+			if err := tx.Model(&models.Report{}).Where("id = ?", rep.ID).Updates(repUpdates).Error; err != nil {
+				return err
+			}
+
+			if prevRepStatus != newRepStatus {
+				if err := utils.RecordAuditLog(
+					tx,
+					&adminID,
+					"REPORT_STATUS_UPDATED",
+					"reports",
+					rep.ID,
+					map[string]interface{}{
+						"ticket_code":           rep.TicketCode,
+						"previous_status":       prevRepStatus,
+						"new_status":            newRepStatus,
+						"unlinked_inventory_id": invID,
+						"reason":                reason,
+					},
+					c.IP(),
+				); err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := tx.Model(&models.Inventory{}).Where("id = ?", invID).Updates(map[string]interface{}{
+			"deleted_by":    adminID,
+			"delete_reason": reason,
+			"updated_at":    now,
+		}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&existing).Error; err != nil {
+			return err
+		}
+
+		return utils.RecordAuditLog(
+			tx,
+			&adminID,
+			"INVENTORY_DELETED",
+			"inventories",
+			invID,
+			map[string]interface{}{
+				"item_name":             existing.ItemName,
+				"internal_category":     existing.InternalCategory,
+				"storage_locker":        existing.StorageLocker,
+				"reason":                reason,
+				"confirm_id":            confirmID,
+				"deletion_mode":         "soft_delete",
+				"unlinked_ticket_codes": unlinkedTickets,
+			},
+			c.IP(),
+		)
+	})
+
+	if txErr != nil {
+		var appErr *utils.AppError
+		if errors.As(txErr, &appErr) {
+			return utils.SendError(c, appErr.Status, appErr.Code, appErr.Message, appErr.Fields)
+		}
+		return utils.SendError(c, fiber.StatusInternalServerError, "INVENTORY_DELETE_FAILED", "Gagal menghapus data inventori di database.", nil)
+	}
+
+	return utils.SendSuccess(c, fiber.StatusOK, fiber.Map{
+		"deleted_id":            invID,
+		"deletion_mode":         "soft_delete",
+		"reason":                reason,
+		"unlinked_ticket_codes": unlinkedTickets,
+	})
 }
 
 func validateRequiredText(fieldErrors map[string]string, fieldKey, value string, maxLen int, label string) {

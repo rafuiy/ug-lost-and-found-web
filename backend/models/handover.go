@@ -1,10 +1,9 @@
 package models
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"time"
 )
 
 type Handover struct {
@@ -19,6 +18,9 @@ type Handover struct {
 	RecipientNPM      string     `gorm:"type:varchar(15);not null" json:"recipient_npm"`
 	HandoverProofPath string     `gorm:"type:varchar(255);not null" json:"-"`
 	HandoverNotes     *string    `gorm:"type:text" json:"handover_notes"`
+	VoidedAt          *time.Time `gorm:"index" json:"voided_at,omitempty"`
+	VoidedBy          *uuid.UUID `gorm:"type:uuid;index" json:"voided_by,omitempty"`
+	VoidReason        *string    `gorm:"type:text" json:"void_reason,omitempty"`
 	CreatedAt         time.Time  `gorm:"index" json:"created_at"`
 }
 

@@ -62,7 +62,7 @@ func TestInventoryAuthGuardAndNoPublicEndpoint(t *testing.T) {
 	respPublic.Body.Close()
 	assert.Equal(t, fiber.StatusNotFound, respPublic.StatusCode)
 
-	// Confirm all 4 admin inventory endpoints reject unauthenticated requests with 401.
+	// Confirm all 5 admin inventory endpoints reject unauthenticated requests with 401.
 	for _, tc := range []struct {
 		method string
 		path   string
@@ -71,6 +71,7 @@ func TestInventoryAuthGuardAndNoPublicEndpoint(t *testing.T) {
 		{"POST", "/api/v1/admin/inventories"},
 		{"GET", "/api/v1/admin/inventories/" + uuid.NewString()},
 		{"PATCH", "/api/v1/admin/inventories/" + uuid.NewString()},
+		{"DELETE", "/api/v1/admin/inventories/" + uuid.NewString()},
 	} {
 		resp, _ := doJSONRequest(t, app, tc.method, tc.path, nil, nil)
 		assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode, "%s %s must require JWT", tc.method, tc.path)
@@ -84,7 +85,7 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	t.Cleanup(func() {
 		if len(createdIDs) > 0 {
 			_ = db.Where("target_table = ? AND target_id IN ?", "inventories", createdIDs).Delete(&models.AuditLog{}).Error
-			_ = db.Where("id IN ?", createdIDs).Delete(&models.Inventory{}).Error
+			_ = db.Unscoped().Where("id IN ?", createdIDs).Delete(&models.Inventory{}).Error
 		}
 	})
 
@@ -242,11 +243,88 @@ func TestInventoryCreateListGetAndUpdate(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "UNKNOWN_FIELD", errEnv.Error.Code)
 
-	// Inventory already Diambil -> 409 INVENTORY_ALREADY_CLAIMED
+	// Inventory already Diambil -> 409 INVENTORY_ALREADY_CLAIMED on PATCH and DELETE
 	require.NoError(t, db.Model(&models.Inventory{}).Where("id = ?", created1.Data.ID).Update("status", models.InventoryStatusDiambil).Error)
 	resp, body = doJSONRequest(t, app, "PATCH", "/api/v1/admin/inventories/"+created1.Data.ID.String(), patchBody, adminHeaders)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 	errEnv = apiErrorEnvelope{}
 	require.NoError(t, json.Unmarshal(body, &errEnv))
 	assert.Equal(t, "INVENTORY_ALREADY_CLAIMED", errEnv.Error.Code)
+
+	delClaimedBody, _ := json.Marshal(map[string]string{
+		"reason":     "Coba hapus barang yang sudah diambil",
+		"confirm_id": created1.Data.ID.String(),
+	})
+	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+created1.Data.ID.String(), delClaimedBody, adminHeaders)
+	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+	errEnv = apiErrorEnvelope{}
+	require.NoError(t, json.Unmarshal(body, &errEnv))
+	assert.Equal(t, "INVENTORY_ALREADY_CLAIMED", errEnv.Error.Code)
+
+	// 8. DELETE soft-delete verification: case-sensitive confirm_id, unlinks Perlu Verifikasi report -> Belum Ada, excludes from active queries
+	linkedRep := models.Report{
+		TicketCode:         "UG-DL999",
+		ReporterName:       "Pelapor Linked",
+		ReporterEmail:      "linked@student.gunadarma.ac.id",
+		NPM:                "51429999",
+		PhoneNumber:        "081299998888",
+		ItemName:           "Laptop ASUS Linked",
+		Category:           "Elektronik",
+		LossLocation:       "Lab TI",
+		LossDatetime:       time.Now().Add(-3 * time.Hour),
+		ItemDescription:    "Laptop tertaut",
+		SecretTraits:       "Ciri rahasia",
+		KtmKrsPath:         "dummy.png",
+		Status:             models.ReportStatusPerluVerifikasi,
+		MatchedInventoryID: &created2.Data.ID,
+	}
+	require.NoError(t, db.Create(&linkedRep).Error)
+	t.Cleanup(func() {
+		_ = db.Where("target_table = ? AND target_id = ?", "reports", linkedRep.ID).Delete(&models.AuditLog{}).Error
+		_ = db.Where("id = ?", linkedRep.ID).Delete(&models.Report{}).Error
+	})
+
+	// Case-mismatch confirm_id (uppercase UUID) -> 422 VALIDATION_ERROR
+	upperConfirm, _ := json.Marshal(map[string]string{
+		"reason":     "Salah input duplikat",
+		"confirm_id": fmt.Sprintf("%s", uuid.MustParse(created2.Data.ID.String())),
+	})
+	_ = upperConfirm
+	badCaseBody, _ := json.Marshal(map[string]string{
+		"reason":     "Salah input duplikat",
+		"confirm_id": "INV-WRONG-ID",
+	})
+	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+created2.Data.ID.String(), badCaseBody, petugasHeaders)
+	assert.Equal(t, fiber.StatusUnprocessableEntity, resp.StatusCode)
+	errEnv = apiErrorEnvelope{}
+	require.NoError(t, json.Unmarshal(body, &errEnv))
+	assert.Contains(t, errEnv.Error.Fields, "confirm_id")
+
+	// Valid DELETE -> 200 OK, soft-deleted in DB, unlinks report back to Belum Ada, writes INVENTORY_DELETED audit log
+	validDeleteBody, _ := json.Marshal(map[string]string{
+		"reason":     "Salah input data barang / duplikasi entri",
+		"confirm_id": created2.Data.ID.String(),
+	})
+	resp, body = doJSONRequest(t, app, "DELETE", "/api/v1/admin/inventories/"+created2.Data.ID.String(), validDeleteBody, petugasHeaders)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode, string(body))
+
+	// Active GET by ID must now return 404 INVENTORY_NOT_FOUND
+	resp, _ = doJSONRequest(t, app, "GET", "/api/v1/admin/inventories/"+created2.Data.ID.String(), nil, petugasHeaders)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+
+	// Unscoped query confirms row still exists in PostgreSQL with deleted_at & delete_reason populated (Soft Delete)
+	var softDeletedInv models.Inventory
+	require.NoError(t, db.Unscoped().Where("id = ?", created2.Data.ID).First(&softDeletedInv).Error)
+	assert.True(t, softDeletedInv.DeletedAt.Valid)
+	require.NotNil(t, softDeletedInv.DeleteReason)
+	assert.Equal(t, "Salah input data barang / duplikasi entri", *softDeletedInv.DeleteReason)
+
+	// Linked report must be reverted to Belum Ada and matched_inventory_id cleared
+	var unlinkedRep models.Report
+	require.NoError(t, db.Where("id = ?", linkedRep.ID).First(&unlinkedRep).Error)
+	assert.Equal(t, models.ReportStatusBelumAda, unlinkedRep.Status)
+	assert.Nil(t, unlinkedRep.MatchedInventoryID)
+
+	var auditDeleted models.AuditLog
+	require.NoError(t, db.Where("action = ? AND target_id = ?", "INVENTORY_DELETED", created2.Data.ID).First(&auditDeleted).Error)
 }

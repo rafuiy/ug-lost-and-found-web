@@ -237,6 +237,83 @@ func BuildReportRejectionEmail(cfg *config.AppConfig, report *models.Report, pub
 	}
 }
 
+// BuildResubmitInvitationEmail builds the cancellation email for Ditolak -> Dibatalkan with a single-use resubmit link.
+func BuildResubmitInvitationEmail(cfg *config.AppConfig, report *models.Report, cancelReason, resubmitURL string) EmailPayload {
+	fullResubmitURL := resubmitURL
+	if cfg != nil && strings.TrimSpace(cfg.PublicAppURL) != "" && strings.HasPrefix(resubmitURL, "/") {
+		fullResubmitURL = strings.TrimRight(strings.TrimSpace(cfg.PublicAppURL), "/") + resubmitURL
+	}
+
+	body := fmt.Sprintf(
+		"Halo %s,\n\n"+
+			"Status penolakan pada laporan kehilangan Anda (%s — %s) telah dibatalkan oleh petugas loket dan kini berstatus: Dibatalkan.\n\n"+
+			"Alasan Petugas:\n%s\n\n"+
+			"Silakan ajukan ulang laporan kehilangan Anda melalui tautan khusus berikut (data dasar Anda akan terisi otomatis):\n"+
+			"Ajukan Ulang Laporan: %s\n\n"+
+			"Catatan: Tautan ini bersifat sekali pakai dan berlaku selama 7 hari.\n\n"+
+			"Salam,\n"+
+			"UG Lost and Found — Universitas Gunadarma",
+		report.ReporterName,
+		report.TicketCode,
+		report.ItemName,
+		cancelReason,
+		fullResubmitURL,
+	)
+
+	return EmailPayload{
+		To:         report.ReporterEmail,
+		Subject:    fmt.Sprintf("[UG Lost & Found] Pembatalan Penolakan & Pengajuan Ulang (%s)", report.TicketCode),
+		Body:       body,
+		EventType:  "RESUBMIT_INVITATION",
+		TicketCode: report.TicketCode,
+	}
+}
+
+// BuildErrorClarificationEmail builds the official clarification email for Selesai -> Dibatalkan (voided handover).
+func BuildErrorClarificationEmail(cfg *config.AppConfig, report *models.Report, cancelReason, resubmitURL string, inventoryRestored bool) EmailPayload {
+	fullResubmitURL := resubmitURL
+	if cfg != nil && strings.TrimSpace(cfg.PublicAppURL) != "" && strings.HasPrefix(resubmitURL, "/") {
+		fullResubmitURL = strings.TrimRight(strings.TrimSpace(cfg.PublicAppURL), "/") + resubmitURL
+	}
+
+	invNote := "Silakan berkoordinasi dengan petugas Loket D untuk tindak lanjut verifikasi."
+	if inventoryRestored {
+		invNote = "Barang fisik terkait tercatat masih/kembali tersimpan di Loket D."
+	}
+
+	resubmitSection := ""
+	if strings.TrimSpace(fullResubmitURL) != "" {
+		resubmitSection = fmt.Sprintf(
+			"\nApabila Anda perlu menerbitkan tiket laporan pengganti, silakan gunakan tautan sekali pakai berikut:\n"+
+				"Ajukan Ulang Laporan: %s\n",
+			fullResubmitURL,
+		)
+	}
+
+	body := fmt.Sprintf(
+		"Halo %s,\n\n"+
+			"Kami menginformasikan bahwa status 'Selesai' pada tiket laporan %s (%s) telah dibatalkan menjadi 'Dibatalkan' karena koreksi operasional loket.\n\n"+
+			"Alasan Koreksi Petugas:\n%s\n\n"+
+			"Keterangan:\n%s\n%s\n"+
+			"Salam,\n"+
+			"UG Lost and Found — Universitas Gunadarma",
+		report.ReporterName,
+		report.TicketCode,
+		report.ItemName,
+		cancelReason,
+		invNote,
+		resubmitSection,
+	)
+
+	return EmailPayload{
+		To:         report.ReporterEmail,
+		Subject:    fmt.Sprintf("[UG Lost & Found] Pemberitahuan Koreksi Status Laporan (%s)", report.TicketCode),
+		Body:       body,
+		EventType:  "ERROR_CLARIFICATION",
+		TicketCode: report.TicketCode,
+	}
+}
+
 func stripCRLF(v string) string {
 	return strings.NewReplacer("\r", "", "\n", "").Replace(v)
 }
