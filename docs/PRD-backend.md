@@ -168,7 +168,7 @@ Barang hanya boleh berubah ke `Diambil` setelah handover berhasil.
 
 ### 8.1 `admins`
 
-- `id` UUID primary key.
+- `id` BIGINT auto-increment primary key (mulai dari 1).
 - `username` varchar(50), unique, required.
 - `password_hash` varchar(255), required.
 - `name` varchar(100), required.
@@ -178,7 +178,7 @@ Password tidak pernah dikembalikan melalui API.
 
 ### 8.2 `reports`
 
-- `id` UUID primary key.
+- `id` BIGINT auto-increment primary key (mulai dari 1).
 - `ticket_code` varchar(12), unique, required.
 - `reporter_name` varchar(100), required.
 - `reporter_email` varchar(100), required.
@@ -199,7 +199,7 @@ Password tidak pernah dikembalikan melalui API.
 
 ### 8.3 `inventories`
 
-- `id` UUID primary key.
+- `id` BIGINT auto-increment primary key (mulai dari 1).
 - `item_name` varchar(100), required.
 - `internal_category` varchar(50), required.
 - `found_location` varchar(150), required.
@@ -214,10 +214,10 @@ Data inventori hanya untuk admin.
 
 ### 8.4 `handovers`
 
-- `id` UUID primary key.
-- `report_id` UUID, unique, foreign key ke `reports.id`.
-- `inventory_id` UUID, foreign key ke `inventories.id`.
-- `admin_id` UUID, foreign key ke `admins.id`.
+- `id` BIGINT auto-increment primary key (mulai dari 1).
+- `report_id` BIGINT, unique, foreign key ke `reports.id`.
+- `inventory_id` BIGINT, foreign key ke `inventories.id`.
+- `admin_id` BIGINT, foreign key ke `admins.id`.
 - `recipient_name` varchar(100), required.
 - `recipient_npm` varchar(15), required.
 - `handover_proof_path` varchar(255), required, privat.
@@ -228,11 +228,11 @@ Satu laporan hanya boleh memiliki satu handover sukses.
 
 ### 8.5 `audit_logs`
 
-- `id` UUID primary key.
-- `admin_id` UUID, nullable untuk aksi sistem.
+- `id` BIGINT auto-increment primary key (mulai dari 1).
+- `admin_id` BIGINT, nullable untuk aksi sistem.
 - `action` varchar(50), required.
 - `target_table` varchar(50), required.
-- `target_id` UUID, required.
+- `target_id` BIGINT, required.
 - `payload` JSONB, nullable.
 - `ip_address` varchar(45), nullable.
 - `created_at`.

@@ -74,7 +74,7 @@ DBPassword: os.Getenv("DB_PASSWORD"),
 
 1. **Inventori Tertutup Total:** Dilarang keras menyediakan endpoint publik untuk mencari, mendaftar, atau melihat detail `inventories`.
 2. **ID & Ticket Code Non-Sequential:**
-   - Semua primary key memakai **UUID** (bukan integer auto-increment yang mudah ditebak/di-enumerate).
+   - Primary key memakai **BIGINT auto-increment** (mulai dari 1). Karena ID mudah ditebak, ID tidak boleh menjadi satu-satunya kontrol akses: semua endpoint yang menerima ID wajib di balik JWT + permission, dan endpoint publik hanya memakai `ticket_code`.
    - `ticket_code` wajib di-generate memakai `crypto/rand` (bukan `math/rand`) dengan alfabet yang jelas dan tidak berurutan.
 3. **Tracking Anti-IDOR:**
    - `POST /api/v1/reports/track` wajib memvalidasi kombinasi `ticket_code` + challenge 4 digit (dari NPM).
