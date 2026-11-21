@@ -72,12 +72,13 @@ function splitLockerFromDetails(rawDetails = '') {
   };
 }
 
+// IDs are numeric in the API; keep them as strings so they compare equal to <select>/input values.
 export function mapBackendInventory(inv) {
   if (!inv) return null;
   const fallback = splitLockerFromDetails(inv.item_details);
   const hasExplicitLocker = Boolean(inv.storage_locker && String(inv.storage_locker).trim());
   return {
-    id: inv.id,
+    id: String(inv.id),
     title: inv.item_name || '',
     category: inv.internal_category || 'Lainnya',
     foundLocation: inv.found_location || '',
@@ -93,7 +94,7 @@ export function mapBackendInventory(inv) {
 
 export function mapBackendReportSummary(item) {
   return {
-    id: item.id,
+    id: String(item.id),
     ticketCode: item.ticket_code,
     reportedAt: formatIsoToDisplay(item.created_at),
     reporterName: item.reporter_name || '',
@@ -112,7 +113,7 @@ export function mapBackendReportSummary(item) {
     hasItemImage: Boolean(item.has_item_image),
     status: item.status,
     isStale: Boolean(item.is_stale),
-    matchedInventoryId: item.matched_inventory_id || '',
+    matchedInventoryId: item.matched_inventory_id ? String(item.matched_inventory_id) : '',
     adminNotes: item.admin_notes || '',
     publicRejectReason: item.rejection_reason || '',
     cancelledFrom: item.cancelled_from || '',
@@ -126,7 +127,7 @@ export function mapBackendReportSummary(item) {
 
 export function mapBackendReportDetail(detail, existingFiles = {}) {
   return {
-    id: detail.id,
+    id: String(detail.id),
     ticketCode: detail.ticket_code,
     reportedAt: formatIsoToDisplay(detail.created_at),
     reporterName: detail.reporter_name || '',
@@ -145,7 +146,7 @@ export function mapBackendReportDetail(detail, existingFiles = {}) {
     hasItemImage: Boolean(detail.files?.has_item_image),
     status: detail.status,
     isStale: Boolean(detail.is_stale),
-    matchedInventoryId: detail.matched_inventory_id || '',
+    matchedInventoryId: detail.matched_inventory_id ? String(detail.matched_inventory_id) : '',
     adminNotes: detail.admin_notes || '',
     publicRejectReason: detail.rejection_reason || '',
     cancelledFrom: detail.cancelled_from || '',
