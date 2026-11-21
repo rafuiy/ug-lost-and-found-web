@@ -50,6 +50,7 @@ export const AdminReportQueue = ({
   onFilterTabChange,
   dateRangeFilter: controlledDateRange,
   onDateRangeFilterChange,
+  onRefresh,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -60,7 +61,8 @@ export const AdminReportQueue = ({
     controlledDateRange !== undefined ? controlledDateRange : internalDateRange;
   const setDateRangeFilter = onDateRangeFilterChange || setInternalDateRange;
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    await onRefresh?.();
     setLastUpdated(formatWibTime(new Date()));
   };
 

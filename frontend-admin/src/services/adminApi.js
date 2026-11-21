@@ -72,16 +72,10 @@ function splitLockerFromDetails(rawDetails = '') {
   };
 }
 
-function combineLockerAndNotes(storageLocker, notes) {
-  const cleanNotes = String(notes || '').trim();
-  const cleanLocker = String(storageLocker || '').trim();
-  if (!cleanLocker) return cleanNotes;
-  return `[${cleanLocker}] ${cleanNotes}`.trim();
-}
-
 export function mapBackendInventory(inv) {
   if (!inv) return null;
-  const { storageLocker, notes } = splitLockerFromDetails(inv.item_details);
+  const fallback = splitLockerFromDetails(inv.item_details);
+  const hasExplicitLocker = Boolean(inv.storage_locker && String(inv.storage_locker).trim());
   return {
     id: inv.id,
     title: inv.item_name || '',
@@ -90,10 +84,10 @@ export function mapBackendInventory(inv) {
     foundDate: formatIsoToDisplay(inv.found_datetime || inv.created_at),
     finderName: inv.finder_name || '',
     finderContact: inv.finder_contact === '-' ? '' : inv.finder_contact || '',
-    storageLocker,
+    storageLocker: hasExplicitLocker ? String(inv.storage_locker).trim() : fallback.storageLocker,
     status: inv.status || 'Tersimpan',
-    notes,
-    photoUrl: '',
+    notes: hasExplicitLocker ? fallback.notes : fallback.notes,
+    photoUrl: inv.photo_url || '',
   };
 }
 
@@ -107,7 +101,7 @@ export function mapBackendReportSummary(item) {
     reporterEmail: item.reporter_email || '',
     reporterPhone: item.phone_number || '',
     itemName: item.item_name || '',
-    category: item.matched_inventory?.internal_category || 'Umum',
+    category: item.category || item.matched_inventory?.internal_category || 'Lainnya',
     lostLocation: item.loss_location || '',
     lostDate: formatIsoToDateOnly(item.loss_datetime),
     description: item.item_description || '',
@@ -121,6 +115,12 @@ export function mapBackendReportSummary(item) {
     matchedInventoryId: item.matched_inventory_id || '',
     adminNotes: item.admin_notes || '',
     publicRejectReason: item.rejection_reason || '',
+    cancelledFrom: item.cancelled_from || '',
+    cancelledBy: item.cancelled_by || '',
+    cancelReason: item.cancel_reason || '',
+    cancelEmailType: item.cancel_email_type || '',
+    resubmitLink: item.resubmit_link || '',
+    reopenedFromTicket: item.reopened_from_ticket || '',
   };
 }
 
@@ -134,7 +134,7 @@ export function mapBackendReportDetail(detail, existingFiles = {}) {
     reporterEmail: detail.reporter_email || '',
     reporterPhone: detail.phone_number || '',
     itemName: detail.item_name || '',
-    category: detail.matched_inventory?.internal_category || 'Umum',
+    category: detail.category || detail.matched_inventory?.internal_category || 'Lainnya',
     lostLocation: detail.loss_location || '',
     lostDate: formatIsoToDateOnly(detail.loss_datetime),
     description: detail.item_description || '',
@@ -148,6 +148,12 @@ export function mapBackendReportDetail(detail, existingFiles = {}) {
     matchedInventoryId: detail.matched_inventory_id || '',
     adminNotes: detail.admin_notes || '',
     publicRejectReason: detail.rejection_reason || '',
+    cancelledFrom: detail.cancelled_from || '',
+    cancelledBy: detail.cancelled_by || '',
+    cancelReason: detail.cancel_reason || '',
+    cancelEmailType: detail.cancel_email_type || '',
+    resubmitLink: detail.resubmit_link || '',
+    reopenedFromTicket: detail.reopened_from_ticket || '',
     detailLoaded: true,
   };
 }
@@ -209,7 +215,15 @@ export async function fetchReportDetailWithFiles(idOrCode) {
 
 export async function updateReportStatus(
   idOrCode,
-  { status, matchedInventoryId, adminNotes, rejectionReason }
+  {
+    status,
+    matchedInventoryId,
+    adminNotes,
+    rejectionReason,
+    cancelReason,
+    restoreInventory,
+    includeResubmitLink,
+  }
 ) {
   const body = { status };
   if (matchedInventoryId !== undefined) {
@@ -220,6 +234,15 @@ export async function updateReportStatus(
   }
   if (rejectionReason !== undefined) {
     body.rejection_reason = rejectionReason;
+  }
+  if (cancelReason !== undefined) {
+    body.cancel_reason = cancelReason;
+  }
+  if (restoreInventory !== undefined) {
+    body.restore_inventory = Boolean(restoreInventory);
+  }
+  if (includeResubmitLink !== undefined) {
+    body.include_resubmit_link = Boolean(includeResubmitLink);
   }
 
   const { data } = await request(
@@ -275,11 +298,13 @@ export async function createInventory(item) {
   const payload = {
     item_name: item.title,
     internal_category: item.category,
+    storage_locker: String(item.storageLocker || 'Loker A-01 (Loket D)').trim(),
     found_location: item.foundLocation,
     found_datetime: parseDisplayDateToIso(item.foundDate),
-    item_details: combineLockerAndNotes(item.storageLocker, item.notes),
+    item_details: String(item.notes || '').trim(),
     finder_name: item.finderName,
     finder_contact: item.finderContact?.trim() || '-',
+    photo_url: item.photoUrl || '',
   };
 
   const { data } = await request('/admin/inventories', {
@@ -294,11 +319,13 @@ export async function updateInventory(id, item) {
   const payload = {
     item_name: item.title,
     internal_category: item.category,
+    storage_locker: String(item.storageLocker || 'Loker A-01 (Loket D)').trim(),
     found_location: item.foundLocation,
     found_datetime: parseDisplayDateToIso(item.foundDate),
-    item_details: combineLockerAndNotes(item.storageLocker, item.notes),
+    item_details: String(item.notes || '').trim(),
     finder_name: item.finderName,
     finder_contact: item.finderContact?.trim() || '-',
+    photo_url: item.photoUrl ?? '',
   };
 
   const { data } = await request(`/admin/inventories/${encodeURIComponent(id)}`, {

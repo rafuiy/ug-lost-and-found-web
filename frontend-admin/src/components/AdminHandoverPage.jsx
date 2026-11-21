@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusStamp } from './ui/Stamp';
 import { Button } from './ui/Button';
 import { INPUT_CLASS, LABEL_CLASS } from './ui/styles';
@@ -83,6 +83,7 @@ export const AdminHandoverPage = ({
   reports,
   inventoryList,
   initialTicketCode = '',
+  onEnsureReportDetail,
   onCompleteHandover,
   onBackToQueue,
 }) => {
@@ -91,7 +92,9 @@ export const AdminHandoverPage = ({
   );
 
   const [ticketInput, setTicketInput] = useState(initialState.ticketInput);
-  const [loadedReport, setLoadedReport] = useState(initialState.loadedReport);
+  const [loadedTicketCode, setLoadedTicketCode] = useState(
+    initialState.loadedReport?.ticketCode || ''
+  );
   const [selectedInventoryId, setSelectedInventoryId] = useState(
     initialState.selectedInventoryId
   );
@@ -112,12 +115,19 @@ export const AdminHandoverPage = ({
 
   const availableInventory = inventoryList.filter((inv) => inv.status === 'Tersimpan');
   const eligibleReports = reports.filter((r) => r.status === 'Perlu Verifikasi');
+  const loadedReport = loadedTicketCode ? findReportByCode(reports, loadedTicketCode) : null;
 
-  const handleLoadData = (codeToSearch) => {
+  useEffect(() => {
+    if (loadedReport && !loadedReport.detailLoaded && onEnsureReportDetail) {
+      onEnsureReportDetail(loadedReport.ticketCode);
+    }
+  }, [loadedReport, onEnsureReportDetail]);
+
+  const handleLoadData = async (codeToSearch) => {
     const code = (codeToSearch || ticketInput).trim().toUpperCase();
     if (!code) {
       setErrorMsg('Masukkan kode tiket pengaduan terlebih dahulu.');
-      setLoadedReport(null);
+      setLoadedTicketCode('');
       setSelectedInventoryId('');
       return;
     }
@@ -126,7 +136,7 @@ export const AdminHandoverPage = ({
     const validationError = validateHandoverReport(found, code);
     if (validationError) {
       setErrorMsg(validationError);
-      setLoadedReport(null);
+      setLoadedTicketCode('');
       setSelectedInventoryId('');
       return;
     }
@@ -136,12 +146,16 @@ export const AdminHandoverPage = ({
       : null;
 
     setErrorMsg('');
-    setLoadedReport(found);
+    setLoadedTicketCode(found.ticketCode);
     setSelectedInventoryId(prematched?.id || '');
     setRecipientName(found.reporterName);
     setRecipientNpm(found.reporterNpm);
     setKtmChecked(false);
     setSecretChecked(false);
+
+    if (!found.detailLoaded && onEnsureReportDetail) {
+      await onEnsureReportDetail(found.ticketCode);
+    }
   };
 
   const selectedInventory =
@@ -208,7 +222,7 @@ export const AdminHandoverPage = ({
   };
 
   const resetForm = () => {
-    setLoadedReport(null);
+    setLoadedTicketCode('');
     setSelectedInventoryId('');
     setTicketInput('');
     setErrorMsg('');

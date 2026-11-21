@@ -193,19 +193,29 @@ export function App() {
     ? reports.find((r) => r.ticketCode === selectedTicketCode) || null
     : null;
 
+  const ensureReportDetailLoaded = useCallback(
+    async (ticketCode) => {
+      if (!ticketCode) return null;
+      try {
+        const detail = await fetchReportDetailWithFiles(ticketCode);
+        setReports((prev) =>
+          prev.map((r) => (r.ticketCode === ticketCode ? { ...r, ...detail } : r))
+        );
+        return detail;
+      } catch (err) {
+        addToast('error', 'Gagal Memuat Detail', err?.message || 'Tidak dapat memuat detail tiket.');
+        return null;
+      }
+    },
+    [addToast]
+  );
+
   const handleReviewReport = async (report) => {
     setSelectedTicketCode(report.ticketCode);
     setIsDrawerOpen(true);
 
     if (!report.detailLoaded) {
-      try {
-        const detail = await fetchReportDetailWithFiles(report.ticketCode);
-        setReports((prev) =>
-          prev.map((r) => (r.ticketCode === report.ticketCode ? { ...r, ...detail } : r))
-        );
-      } catch (err) {
-        addToast('error', 'Gagal Memuat Detail', err?.message || 'Tidak dapat memuat detail tiket.');
-      }
+      await ensureReportDetailLoaded(report.ticketCode);
     }
   };
 
@@ -297,6 +307,8 @@ export function App() {
     try {
       await updateReportStatus(reportCode, {
         status: 'Dibatalkan',
+        cancelReason: reason,
+        includeResubmitLink: true,
         adminNotes: `${
           target?.adminNotes ? target.adminNotes + ' | ' : ''
         }Status Ditolak dibatalkan menjadi Dibatalkan (${reason}).`,
@@ -305,22 +317,28 @@ export function App() {
       addToast(
         'success',
         'Status Ditolak → Dibatalkan',
-        `Tiket ${reportCode} diubah menjadi Dibatalkan.`
+        `Tiket ${reportCode} diubah menjadi Dibatalkan & tautan ajukan ulang telah dikirim ke email pelapor.`
       );
     } catch (err) {
       addToast(
         'error',
-        'Belum Didukung Backend',
-        err?.message || 'Backend saat ini belum membuka transisi Ditolak → Dibatalkan.'
+        'Gagal Membatalkan Status Ditolak',
+        err?.message || 'Gagal memproses pembatalan status Ditolak.'
       );
     }
   };
 
-  const handleVoidHandover = async (reportCode, { reason }) => {
+  const handleVoidHandover = async (
+    reportCode,
+    { reason, restoreInventory = true, includeResubmitLink = true }
+  ) => {
     const target = reports.find((r) => r.ticketCode === reportCode);
     try {
       await updateReportStatus(reportCode, {
         status: 'Dibatalkan',
+        cancelReason: reason,
+        restoreInventory,
+        includeResubmitLink,
         adminNotes: `${
           target?.adminNotes ? target.adminNotes + ' | ' : ''
         }Status Selesai dibatalkan menjadi Dibatalkan (${reason}).`,
@@ -329,13 +347,15 @@ export function App() {
       addToast(
         'warning',
         'Status Selesai → Dibatalkan',
-        `Tiket ${reportCode} diubah menjadi Dibatalkan.`
+        `Tiket ${reportCode} diubah menjadi Dibatalkan${
+          restoreInventory ? ' & inventori dikembalikan ke Tersimpan' : ''
+        }.`
       );
     } catch (err) {
       addToast(
         'error',
-        'Belum Didukung Backend',
-        err?.message || 'Backend saat ini belum membuka void/revert untuk status Selesai.'
+        'Gagal Membatalkan Status Selesai',
+        err?.message || 'Gagal memproses pembatalan status Selesai.'
       );
     }
   };
@@ -435,8 +455,8 @@ export function App() {
     } catch (err) {
       addToast(
         'error',
-        'Hapus Inventori Belum Didukung Backend',
-        err?.message || 'Endpoint DELETE /api/v1/admin/inventories/:id belum tersedia di backend.'
+        'Gagal Menghapus Inventori',
+        err?.message || 'Gagal menghapus data inventori.'
       );
     }
   };
@@ -549,6 +569,7 @@ export function App() {
               onFilterTabChange={setActiveFilterTab}
               dateRangeFilter={dateRangeFilter}
               onDateRangeFilterChange={setDateRangeFilter}
+              onRefresh={refreshAdminData}
             />
           </div>
         )}
@@ -570,6 +591,7 @@ export function App() {
             reports={reports}
             inventoryList={inventoryList}
             initialTicketCode={handoverPreloadTicket}
+            onEnsureReportDetail={ensureReportDetailLoaded}
             onCompleteHandover={handleCompleteHandover}
             onBackToQueue={() => handleSelectTab('queue')}
           />
